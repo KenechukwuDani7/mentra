@@ -1,0 +1,4 @@
+[functions.mentra-ai]
+# The function verifies the user's Supabase JWT in code so it can return a
+# consistent JSON error body to the mobile client.
+verify_jwt = false

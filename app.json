@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Mentra",
+    "slug": "mentra",
+    "scheme": "mentra",
+    "version": "1.1.4",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/mentra-mark.png",
+    "splash": {
+      "image": "./assets/mentra-mark.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F8FAFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mentra.study"
+    },
+    "android": {
+      "versionCode": 11,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/mentra-mark.png",
+        "backgroundColor": "#F8FAFF"
+      },
+      "package": "com.mentra.study",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "plugins": [
+      "expo-document-picker",
+      "expo-image-picker",
+      "expo-web-browser",
+      "expo-font",
+      "@config-plugins/react-native-blob-util",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/mentra-mark.png",
+          "color": "#2367E8"
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "80eb4fd2-c5ff-4eea-b7c7-8811107812df"
+      }
+    },
+    "owner": "kodathegreat"
+  }
+}

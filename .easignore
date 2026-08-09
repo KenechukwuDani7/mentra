@@ -1,0 +1,11 @@
+node_modules/
+.git/
+.codex/
+.agents/
+.expo/
+dist/
+web-build/
+*.log
+*.apk
+.env
+.env.local

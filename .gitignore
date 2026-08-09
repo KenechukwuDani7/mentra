@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+*.apk
+.env
+.env.local
+supabase/.temp/
+package-lock.before-repair.json
+.agents/
+.codex/
