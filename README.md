@@ -29,10 +29,15 @@ insert — the file reaches Storage, then the row that records it cannot be writ
 app deletes the orphaned file and reports the error. Grounded AI answers cannot work
 either, since the gateway looks materials up by id.
 
-Fix it in the Supabase dashboard: **SQL Editor → New query →** paste the whole of
-`supabase/schema.sql` **→ Run**. The script is idempotent, so it is safe on a project
-where Storage already exists, and it ends with `notify pgrst, 'reload schema'` so
-PostgREST picks the new tables up immediately instead of waiting for a restart.
+Fix it either way:
+
+- **Dashboard:** SQL Editor → New query → paste the whole of `supabase/schema.sql` → Run.
+- **CLI:** `supabase db push`, which applies `migrations/20260807000000_core_schema.sql`.
+
+The two files hold the same SQL; keep them in sync when you change either. It is
+idempotent, so it is safe on a project where Storage already exists, and it ends with
+`notify pgrst, 'reload schema'` so PostgREST picks the new tables up immediately instead
+of waiting for a restart.
 
 Verify with any authenticated client, or:
 
