@@ -36,7 +36,8 @@ export const auth = {
     if (error) throw error;
   },
 
-  async signInWithProvider(provider: Extract<Provider, 'google' | 'apple'>, redirectTo: string) {
+  /** Mentra offers email and Google only — Apple sign-in is deliberately not supported. */
+  async signInWithProvider(provider: Extract<Provider, 'google'>, redirectTo: string) {
     const { data, error } = await requireClient().auth.signInWithOAuth({
       provider,
       options: { redirectTo, skipBrowserRedirect: true },

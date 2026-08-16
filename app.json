@@ -3,30 +3,38 @@
     "name": "Mentra",
     "slug": "mentra",
     "scheme": "mentra",
-    "version": "1.1.4",
+    "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/mentra-mark.png",
     "splash": {
       "image": "./assets/mentra-mark.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F8FAFF"
+      "backgroundColor": "#FBFCFE",
+      "dark": {
+        "image": "./assets/mentra-mark.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0B0D12"
+      }
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mentra.study"
     },
     "android": {
-      "versionCode": 11,
+      "versionCode": 12,
       "adaptiveIcon": {
         "foregroundImage": "./assets/mentra-mark.png",
-        "backgroundColor": "#F8FAFF"
+        "backgroundColor": "#FBFCFE"
       },
       "package": "com.mentra.study",
+      "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ]
     },
     "plugins": [
@@ -38,8 +46,9 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/mentra-mark.png",
-          "color": "#2367E8"
+          "icon": "./assets/notification-icon.png",
+          "color": "#1F5FDB",
+          "defaultChannel": "planner-reminders"
         }
       ],
       "@react-native-community/datetimepicker"

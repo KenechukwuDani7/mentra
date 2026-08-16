@@ -34,16 +34,24 @@ const corsHeaders = {
 const MAX_CONTEXT_CHARACTERS = 18_000;
 const MATERIAL_BUCKET = Deno.env.get('STUDY_MATERIALS_BUCKET')?.trim() || 'study-materials';
 const MATERIAL_FILE_LIMIT = 25 * 1024 * 1024;
+// Keep in sync with the widen_study_material_mime_types migration and with
+// mimeByExtension in src/services/upload.ts. octet-stream is allowed because
+// some Android document providers report it for files with no extension; the
+// client still blocks video and audio before anything is uploaded.
 const MATERIAL_MIME_TYPES = [
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.presentation',
+  'application/vnd.oasis.opendocument.spreadsheet',
   'application/rtf',
   'text/plain',
   'text/markdown',
   'text/csv',
+  'text/tab-separated-values',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'image/jpeg',
@@ -51,6 +59,9 @@ const MATERIAL_MIME_TYPES = [
   'image/webp',
   'image/heic',
   'image/heif',
+  'image/gif',
+  'image/bmp',
+  'application/octet-stream',
 ];
 const STOP_WORDS = new Set([
   'about', 'after', 'again', 'also', 'because', 'been', 'before', 'being',
