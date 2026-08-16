@@ -27,9 +27,10 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BottomNav } from '@/components/bottom-nav';
+import { BOTTOM_NAV_CLEARANCE, BottomNav } from '@/components/bottom-nav';
+import { HomeSkeleton, SplashScreen } from '@/components/loading';
 import { MaterialRow } from '@/components/material-row';
-import { EmptyState, IconButton, Pill, ProgressBar, SectionHeader, SoftCard } from '@/components/ui';
+import { Button, Chip, Divider, EmptyState, IconButton, Pill, ProgressBar, SectionHeader, SoftCard } from '@/components/ui';
 import { privacyReviewNote, privacySections } from '@/content/privacy';
 import { subjectCatalog, supportedLanguages } from '@/constants/study';
 import { getInterfaceCopy } from '@/constants/language';
@@ -40,7 +41,7 @@ import { auth } from '@/services/auth';
 import { ai } from '@/services/ai';
 import { cancelStudyTaskNotification, scheduleStudyTaskNotification } from '@/services/notifications';
 import { pickChatAttachment, pickQuestionImage, pickStudyFile, uploadStudyMaterial, type PickedFile } from '@/services/upload';
-import { radius, themes, type AppTheme } from '@/theme/tokens';
+import { elevation, radius, spacing, themes, type, type AppTheme } from '@/theme/tokens';
 import type { AiAnswer, ChatMessage, GeneratedFlashcard, GeneratedQuiz, PlannerItem, PracticeActivity, RootTab, StudyMaterial, StudySolution, ThemeMode } from '@/types';
 
 type AppStage = 'loading' | 'welcome' | 'auth' | 'verifyEmail' | 'onboarding' | 'app';
@@ -102,6 +103,8 @@ function MentraApp() {
   const [practiceHistory, setPracticeHistory] = useState<PracticeActivity[]>([]);
   const [generatedFlashcards, setGeneratedFlashcards] = useState<GeneratedFlashcard[]>([]);
   const [quizMaterialId, setQuizMaterialId] = useState<string | null>(null);
+  const [studyPlan, setStudyPlan] = useState<PlannerItem[]>([]);
+  const [studyPlanReady, setStudyPlanReady] = useState(false);
   const themeMode: ThemeMode = themePreference === 'system' ? (systemTheme === 'dark' ? 'dark' : 'light') : themePreference;
   const theme = themes[themeMode];
   const withInterfaceLanguage = (content: React.ReactNode) => <InterfaceLanguageContext.Provider value={language}>{content}</InterfaceLanguageContext.Provider>;
@@ -162,6 +165,28 @@ function MentraApp() {
   useEffect(() => {
     if (materialsReady) void AsyncStorage.setItem(PRACTICE_HISTORY_KEY, JSON.stringify(practiceHistory));
   }, [materialsReady, practiceHistory]);
+
+  useEffect(() => {
+    void AsyncStorage.getItem(PLANNER_STORAGE_KEY).then((saved) => {
+      if (!saved) return;
+      try {
+        const parsed = JSON.parse(saved) as PlannerItem[];
+        if (Array.isArray(parsed)) setStudyPlan(parsed.filter((item) => item.scheduledAt));
+      } catch {
+        // Ignore invalid legacy planner data.
+      }
+    }).finally(() => setStudyPlanReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (studyPlanReady) void AsyncStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(studyPlan));
+  }, [studyPlan, studyPlanReady]);
+
+  // Badge the Planner tab when something is scheduled within the next day.
+  const plannerHasDueTask = studyPlan.some((item) => {
+    const due = new Date(item.scheduledAt ?? 0).getTime();
+    return Number.isFinite(due) && due >= Date.now() && due - Date.now() <= 24 * 60 * 60 * 1000;
+  });
 
   const addPracticeActivity = (activity: Omit<PracticeActivity, 'id' | 'createdAt'>) => {
     setPracticeHistory((current) => [{ ...activity, id: `practice-${Date.now()}`, createdAt: 'Just now' }, ...current].slice(0, 50));
@@ -327,7 +352,7 @@ function MentraApp() {
         {!profileOpen && activeTab === 'Practice' ? (
           <PracticeScreen theme={theme} focusSubjects={focusSubjects} history={practiceHistory} onAdd={() => setSheet('practiceCreate')} onOpenQuiz={() => { setQuizMaterialId(null); setSheet('quiz'); }} onOpenSolver={() => setSheet('solver')} />
         ) : null}
-        {!profileOpen && activeTab === 'Planner' ? <PlannerScreen theme={theme} focusSubjects={focusSubjects} /> : null}
+        {!profileOpen && activeTab === 'Planner' ? <PlannerScreen theme={theme} focusSubjects={focusSubjects} items={studyPlan} onChangeItems={setStudyPlan} /> : null}
         {!profileOpen && activeTab === 'Settings' ? (
           <SettingsScreen
             theme={theme}
@@ -355,15 +380,16 @@ function MentraApp() {
           />
         ) : null}
       </View>
-      {sheet === 'none' ? <BottomNav active={activeTab} onChange={(tab) => { setProfileOpen(false); setActiveTab(tab); }} theme={theme} language={language} /> : null}
       {sheet === 'none' && !profileOpen && activeTab === 'Home' ? <Pressable
         accessibilityRole="button"
         accessibilityLabel="Create or ask Mentra"
         onPress={() => setSheet('actions')}
-        style={({ pressed }) => [styles.fab, { backgroundColor: theme.brand, bottom: 76 + insets.bottom, opacity: pressed ? 0.8 : 1 }]}
+        android_ripple={{ color: 'rgba(255,255,255,0.22)', borderless: false }}
+        style={({ pressed }) => [styles.fab, elevation(3, theme.shadow), { backgroundColor: theme.brand, bottom: BOTTOM_NAV_CLEARANCE + insets.bottom + 12, opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] }]}
       >
-        <Ionicons name="add" size={29} color="#FFFFFF" />
+        <Ionicons name="add" size={28} color={theme.onBrand} />
       </Pressable> : null}
+      {sheet === 'none' ? <BottomNav active={activeTab} onChange={(tab) => { setProfileOpen(false); setActiveTab(tab); }} theme={theme} badges={{ Planner: plannerHasDueTask }} /> : null}
 
       <ActionSheet
         visible={sheet === 'actions'}
@@ -621,35 +647,10 @@ function VerifyEmailScreen({
 }
 
 function LoadingScreen({ theme }: { theme: AppTheme }) {
-  const scale = useRef(new Animated.Value(0.92)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const entrance = Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 480, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-    ]);
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.035, duration: 900, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ]),
-    );
-    entrance.start(() => pulse.start());
-    return () => { entrance.stop(); pulse.stop(); };
-  }, [opacity, scale]);
-
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}> 
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      <View style={[styles.loadingScreen, { backgroundColor: theme.background }]}> 
-        <Animated.View style={[styles.loadingMark, { backgroundColor: '#FFFFFF', borderColor: theme.line, opacity, transform: [{ scale }] }]}>
-          <Image source={logo} resizeMode="contain" style={styles.loadingLogo} />
-        </Animated.View>
-        <Text style={[styles.loadingWordmark, { color: theme.text }]}>Mentra</Text>
-        <Text style={[styles.loadingTagline, { color: theme.textMuted }]}>Study smarter, achieve more.</Text>
-        <ActivityIndicator color={theme.brand} style={styles.loadingIndicator} />
-      </View>
+      <SplashScreen theme={theme} />
     </SafeAreaView>
   );
 }
@@ -1017,111 +1018,256 @@ function formatPlannerTime(date: Date) {
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function PlannerScreen({ theme, focusSubjects }: { theme: AppTheme; focusSubjects: string[] }) {
-  const [items, setItems] = useState<PlannerItem[]>([]);
-  const [ready, setReady] = useState(false);
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/**
+ * Month grid for the planner. Days that carry a task show a dot in the task's
+ * type colour, and tapping a day filters the schedule list beneath it.
+ */
+function MonthCalendar({
+  theme,
+  month,
+  selected,
+  items,
+  onSelect,
+  onChangeMonth,
+}: {
+  theme: AppTheme;
+  month: Date;
+  selected: Date;
+  items: PlannerItem[];
+  onSelect: (day: Date) => void;
+  onChangeMonth: (delta: number) => void;
+}) {
+  const today = new Date();
+  const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const leadingBlanks = firstOfMonth.getDay();
+  const cells: (Date | null)[] = [
+    ...Array.from({ length: leadingBlanks }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1)),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const tasksOn = (day: Date) => items.filter((item) => isSameDay(new Date(item.scheduledAt ?? 0), day));
+
+  return (
+    <View style={[styles.calendarCard, { backgroundColor: theme.surfaceContainer }]}>
+      <View style={styles.calendarHeader}>
+        <Text style={[styles.calendarMonth, { color: theme.text }]}>
+          {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        </Text>
+        <View style={styles.calendarNav}>
+          <IconButton icon="chevron-back" label="Previous month" theme={theme} size={38} onPress={() => onChangeMonth(-1)} />
+          <IconButton icon="chevron-forward" label="Next month" theme={theme} size={38} onPress={() => onChangeMonth(1)} />
+        </View>
+      </View>
+
+      <View style={styles.calendarWeekRow}>
+        {WEEKDAY_INITIALS.map((initial, index) => (
+          <Text key={`${initial}-${index}`} style={[styles.calendarWeekday, { color: theme.textSubtle }]}>{initial}</Text>
+        ))}
+      </View>
+
+      <View style={styles.calendarGrid}>
+        {cells.map((day, index) => {
+          if (!day) return <View key={`blank-${index}`} style={styles.calendarCell} />;
+          const dayTasks = tasksOn(day);
+          const isSelected = isSameDay(day, selected);
+          const isToday = isSameDay(day, today);
+          return (
+            <Pressable
+              key={day.toISOString()}
+              accessibilityRole="button"
+              accessibilityLabel={`${day.getDate()}, ${dayTasks.length} task${dayTasks.length === 1 ? '' : 's'}`}
+              accessibilityState={{ selected: isSelected }}
+              onPress={() => onSelect(day)}
+              android_ripple={{ color: `${theme.brand}20`, borderless: true, radius: 22 }}
+              style={styles.calendarCell}
+            >
+              <View style={[styles.calendarCellInner, isSelected ? { backgroundColor: theme.brand } : isToday ? { borderWidth: 1.5, borderColor: theme.brand } : null]}>
+                <Text style={[styles.calendarCellText, { color: isSelected ? theme.onBrand : isToday ? theme.brand : theme.text, fontWeight: isSelected || isToday ? '700' : '500' }]}>
+                  {day.getDate()}
+                </Text>
+              </View>
+              <View style={styles.calendarDotRow}>
+                {dayTasks.slice(0, 3).map((task) => (
+                  <View
+                    key={task.id}
+                    style={[styles.calendarDot, { backgroundColor: isSelected ? theme.brand : task.type === 'Exam' ? theme.danger : task.type === 'Revision' ? theme.violet : theme.success }]}
+                  />
+                ))}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function PlannerScreen({
+  theme,
+  focusSubjects,
+  items,
+  onChangeItems,
+}: {
+  theme: AppTheme;
+  focusSubjects: string[];
+  items: PlannerItem[];
+  onChangeItems: (update: (current: PlannerItem[]) => PlannerItem[]) => void;
+}) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<PlannerItem | null>(null);
-
-  useEffect(() => {
-    void AsyncStorage.getItem(PLANNER_STORAGE_KEY).then((saved) => {
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as PlannerItem[];
-          if (Array.isArray(parsed)) setItems(parsed.filter((item) => item.scheduledAt));
-        } catch {
-          // Ignore invalid legacy planner data.
-        }
-      }
-    }).finally(() => setReady(true));
-  }, []);
-
-  useEffect(() => {
-    if (ready) void AsyncStorage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(items));
-  }, [items, ready]);
+  const [selectedDay, setSelectedDay] = useState(() => new Date());
+  const [month, setMonth] = useState(() => { const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), 1); });
 
   const sortedItems = [...items].sort((a, b) => new Date(a.scheduledAt ?? 0).getTime() - new Date(b.scheduledAt ?? 0).getTime());
-  const upcoming = sortedItems.filter((item) => new Date(item.scheduledAt ?? 0).getTime() >= Date.now());
-  const nextItem = upcoming[0];
-  const week = Array.from({ length: 7 }, (_, index) => { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() + index); return date; });
-  const hasTaskOnDay = (day: Date) => items.some((item) => { const taskDate = new Date(item.scheduledAt ?? 0); return taskDate.getFullYear() === day.getFullYear() && taskDate.getMonth() === day.getMonth() && taskDate.getDate() === day.getDate(); });
+  const nextItem = sortedItems.find((item) => new Date(item.scheduledAt ?? 0).getTime() >= Date.now());
+  const dayItems = sortedItems.filter((item) => isSameDay(new Date(item.scheduledAt ?? 0), selectedDay));
 
   const saveItem = async (draft: PlannerItem) => {
     const notificationId = await scheduleStudyTaskNotification({ id: draft.id, title: draft.title, subject: draft.subject, type: draft.type, scheduledAt: draft.scheduledAt! });
     if (editing?.notificationId) await cancelStudyTaskNotification(editing.notificationId);
     const saved = { ...draft, notificationId };
-    setItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [...current, saved]);
+    onChangeItems((current) => editing ? current.map((item) => item.id === editing.id ? saved : item) : [...current, saved]);
+    setSelectedDay(new Date(saved.scheduledAt!));
     setEditorOpen(false);
     setEditing(null);
   };
+
   const deleteItem = async (item: PlannerItem) => {
     await cancelStudyTaskNotification(item.notificationId);
-    setItems((current) => current.filter((candidate) => candidate.id !== item.id));
+    onChangeItems((current) => current.filter((candidate) => candidate.id !== item.id));
     setEditorOpen(false);
     setEditing(null);
+  };
+
+  const openFor = (day?: Date) => {
+    setEditing(null);
+    if (day) setSelectedDay(day);
+    setEditorOpen(true);
   };
 
   return <>
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.titleRow}><View style={{ flex: 1 }}><Text style={[styles.screenTitle, { color: theme.text }]}>Study planner</Text><Text style={[styles.screenSubtitle, { color: theme.textMuted }]}>Plan tasks and get reminded when it is time.</Text></View><IconButton icon="add" label="Add study task" theme={theme} tone="brand" onPress={() => { setEditing(null); setEditorOpen(true); }} /></View>
-      <View style={[styles.examCard, { backgroundColor: theme.surface, borderColor: theme.line }]}><View style={[styles.examIcon, { backgroundColor: theme.brandSoft }]}><Ionicons name={nextItem?.type === 'Exam' ? 'school-outline' : 'calendar-outline'} color={theme.brand} size={23} /></View><View style={{ flex: 1 }}><Text style={[styles.examDate, { color: theme.brand }]}>{nextItem ? 'NEXT ON YOUR PLAN' : 'YOUR STUDY PLAN'}</Text><Text style={[styles.examTitle, { color: theme.text }]}>{nextItem?.title ?? 'Nothing scheduled yet'}</Text><Text style={[styles.examBody, { color: theme.textMuted }]}>{nextItem ? `${formatPlannerDate(new Date(nextItem.scheduledAt!))} at ${formatPlannerTime(new Date(nextItem.scheduledAt!))}` : 'Add a study session, revision, or exam reminder.'}</Text></View></View>
-      <View style={[styles.calendarStrip, { backgroundColor: theme.surface, borderColor: theme.line }]}>{week.map((day, index) => { const marked = hasTaskOnDay(day); return <View key={day.toISOString()} style={styles.calendarDay}><Text style={[styles.calendarLabel, { color: theme.textMuted }]}>{day.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)}</Text><View style={[styles.calendarDate, { backgroundColor: marked ? theme.brand : 'transparent', borderColor: index === 0 ? theme.brand : 'transparent', borderWidth: index === 0 ? 1 : 0 }]}><Text style={[styles.calendarNumber, { color: marked ? '#FFF' : theme.text }]}>{day.getDate()}</Text></View><View style={[styles.plannerCalendarDot, marked ? { backgroundColor: theme.brand } : null]} /></View>; })}</View>
-      {sortedItems.length ? <><SectionHeader title="Your schedule" theme={theme} /><View style={styles.scheduleList}>{sortedItems.map((item) => <PlannerTaskRow key={item.id} item={item} theme={theme} onEdit={() => { setEditing(item); setEditorOpen(true); }} onDelete={() => Alert.alert('Delete this task?', `${item.title} and its notification will be removed.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void deleteItem(item) }])} />)}</View></> : <EmptyState icon="calendar-outline" title="Your schedule is clear" description="Tap + to choose a date and time for your first study reminder." theme={theme} />}
-      <SoftCard theme={theme} style={styles.planTip}><Ionicons name="notifications-outline" color={theme.warning} size={22} /><Text style={[styles.planTipText, { color: theme.textMuted }]}>Mentra will ask for notification access when you save your first reminder.</Text></SoftCard>
+      <View style={styles.titleRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.screenTitle, { color: theme.text }]}>Planner</Text>
+          <Text style={[styles.screenSubtitle, { color: theme.textMuted }]}>Plan your study and get reminded on time.</Text>
+        </View>
+        <IconButton icon="add" label="Add study task" theme={theme} tone="brand" onPress={() => openFor()} />
+      </View>
+
+      <View style={[styles.nextUpCard, { backgroundColor: theme.brandContainer }]}>
+        <View style={[styles.nextUpIcon, { backgroundColor: theme.surface }]}>
+          <Ionicons name={nextItem?.type === 'Exam' ? 'school' : 'time'} color={theme.brand} size={22} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.nextUpLabel, { color: theme.onBrandContainer }]}>{nextItem ? 'NEXT UP' : 'NOTHING SCHEDULED'}</Text>
+          <Text numberOfLines={1} style={[styles.nextUpTitle, { color: theme.onBrandContainer }]}>{nextItem?.title ?? 'Your schedule is clear'}</Text>
+          <Text style={[styles.nextUpMeta, { color: theme.onBrandContainer }]}>
+            {nextItem ? `${formatPlannerDate(new Date(nextItem.scheduledAt!))} · ${formatPlannerTime(new Date(nextItem.scheduledAt!))}` : 'Tap + to plan your first study session.'}
+          </Text>
+        </View>
+      </View>
+
+      <MonthCalendar
+        theme={theme}
+        month={month}
+        selected={selectedDay}
+        items={items}
+        onSelect={setSelectedDay}
+        onChangeMonth={(delta) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1))}
+      />
+
+      <SectionHeader
+        title={isSameDay(selectedDay, new Date()) ? 'Today' : formatPlannerDate(selectedDay)}
+        action="Add task"
+        onAction={() => openFor(selectedDay)}
+        theme={theme}
+        style={{ marginTop: spacing.xxl }}
+      />
+      {dayItems.length ? (
+        <View style={styles.scheduleList}>
+          {dayItems.map((item) => (
+            <PlannerTaskRow
+              key={item.id}
+              item={item}
+              theme={theme}
+              onEdit={() => { setEditing(item); setEditorOpen(true); }}
+              onDelete={() => Alert.alert('Delete this task?', `${item.title} and its reminder will be removed.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void deleteItem(item) }])}
+            />
+          ))}
+        </View>
+      ) : (
+        <EmptyState
+          icon="calendar-outline"
+          title="Nothing on this day"
+          description="Pick another day on the calendar, or add a study session for this one."
+          theme={theme}
+          action="Add a task"
+          onAction={() => openFor(selectedDay)}
+        />
+      )}
+
+      {sortedItems.length ? <>
+        <SectionHeader title="All upcoming" theme={theme} style={{ marginTop: spacing.xxl }} />
+        <View style={styles.scheduleList}>
+          {sortedItems.filter((item) => new Date(item.scheduledAt ?? 0).getTime() >= Date.now()).slice(0, 6).map((item) => (
+            <PlannerTaskRow
+              key={`upcoming-${item.id}`}
+              item={item}
+              theme={theme}
+              onEdit={() => { setEditing(item); setEditorOpen(true); }}
+              onDelete={() => Alert.alert('Delete this task?', `${item.title} and its reminder will be removed.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void deleteItem(item) }])}
+            />
+          ))}
+        </View>
+      </> : null}
     </ScrollView>
-    <PlannerEditor visible={editorOpen} theme={theme} focusSubjects={focusSubjects} item={editing} onClose={() => { setEditorOpen(false); setEditing(null); }} onSave={saveItem} onDelete={editing ? () => void deleteItem(editing) : undefined} />
+    <PlannerEditor visible={editorOpen} theme={theme} focusSubjects={focusSubjects} item={editing} initialDate={selectedDay} onClose={() => { setEditorOpen(false); setEditing(null); }} onSave={saveItem} onDelete={editing ? () => void deleteItem(editing) : undefined} />
   </>;
-}
-
-function LegacyPlannerScreen({ theme, focusSubjects }: { theme: AppTheme; focusSubjects: string[] }) {
-  return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.titleRow}>
-        <View><Text style={[styles.screenTitle, { color: theme.text }]}>Study planner</Text><Text style={[styles.screenSubtitle, { color: theme.textMuted }]}>Small, focused steps add up.</Text></View>
-        <IconButton icon="add" label="Add study task" theme={theme} tone="brand" onPress={() => Alert.alert('Planner ready', 'Your first study task can be added here soon.')} />
-      </View>
-      <View style={[styles.examCard, { backgroundColor: theme.surface, borderColor: theme.line }]}>
-        <View style={[styles.examIcon, { backgroundColor: theme.surface }]}><Ionicons name="calendar-outline" color={theme.brand} size={23} /></View>
-        <View style={{ flex: 1 }}><Text style={[styles.examDate, { color: theme.brandDark }]}>YOUR STUDY PLAN</Text><Text style={[styles.examTitle, { color: theme.text }]}>Nothing scheduled yet</Text><Text style={[styles.examBody, { color: theme.textMuted }]}>Set a study session or an exam date whenever you are ready.</Text></View>
-      </View>
-      {focusSubjects.length ? <View style={styles.subjectFocusRow}>{focusSubjects.map((subject) => <View key={subject} style={[styles.subjectFocusChip, { backgroundColor: theme.brandSoft }]}><Text style={[styles.subjectFocusText, { color: theme.brand }]}>{subject}</Text></View>)}</View> : null}
-      <EmptyState icon="calendar-outline" title="Your schedule is clear" description="Add a study session to start building a routine around your subjects." theme={theme} />
-      <SoftCard theme={theme} style={styles.planTip}><Ionicons name="bulb-outline" color={theme.warning} size={22} /><Text style={[styles.planTipText, { color: theme.textMuted }]}>Start with short sessions. Consistency beats cramming.</Text></SoftCard>
-    </ScrollView>
-  );
-
-  return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.titleRow}>
-        <View><Text style={[styles.screenTitle, { color: theme.text }]}>Study planner</Text><Text style={[styles.screenSubtitle, { color: theme.textMuted }]}>Small, focused steps add up.</Text></View>
-        <IconButton icon="add" label="Add study task" theme={theme} tone="brand" onPress={() => Alert.alert('Planner ready', 'Connect your calendar service to create and sync study sessions.')} />
-      </View>
-      <View style={[styles.examCard, { backgroundColor: theme.surface, borderColor: theme.line }]}>
-        <View style={[styles.examIcon, { backgroundColor: theme.surface }]}><Ionicons name="school" color={theme.brand} size={23} /></View>
-        <View style={{ flex: 1 }}><Text style={[styles.examDate, { color: theme.brandDark }]}>NEXT EXAM · 5 DAYS</Text><Text style={[styles.examTitle, { color: theme.text }]}>Chemistry mid-term</Text><Text style={[styles.examBody, { color: theme.textMuted }]}>You have 3 revision sessions planned.</Text></View>
-      </View>
-      <View style={[styles.calendarStrip, { backgroundColor: theme.surface, borderColor: theme.line }]}> 
-        {['Mon 17', 'Tue 18', 'Wed 19', 'Thu 20', 'Fri 21'].map((day, index) => (
-          <View key={day} style={styles.calendarDay}><Text style={[styles.calendarLabel, { color: theme.textMuted }]}>{day.slice(0, 3)}</Text><View style={[styles.calendarDate, { backgroundColor: index === 3 ? theme.brand : 'transparent' }]}><Text style={[styles.calendarNumber, { color: index === 3 ? '#FFF' : theme.text }]}>{day.slice(-2)}</Text></View></View>
-        ))}
-      </View>
-      <SectionHeader title="Your schedule" theme={theme} />
-      <View style={styles.scheduleList}>
-        {plannerItems.map((item) => <PlannerRow key={item.id} item={item} theme={theme} />)}
-      </View>
-      <SoftCard theme={theme} style={styles.planTip}><Ionicons name="bulb-outline" color={theme.warning} size={22} /><Text style={[styles.planTipText, { color: theme.textMuted }]}>Plan shorter sessions on busy days. Consistency beats cramming.</Text></SoftCard>
-    </ScrollView>
-  );
 }
 
 function PlannerTaskRow({ item, theme, onEdit, onDelete }: { item: PlannerItem; theme: AppTheme; onEdit: () => void; onDelete: () => void }) {
   const color = item.type === 'Exam' ? theme.danger : item.type === 'Revision' ? theme.brand : theme.success;
   const scheduled = new Date(item.scheduledAt ?? 0);
   const past = scheduled.getTime() < Date.now();
-  return <Pressable onPress={onEdit} style={({ pressed }) => [styles.plannerRow, { backgroundColor: theme.surface, borderColor: theme.line, opacity: past ? 0.62 : pressed ? 0.78 : 1 }]}><View style={[styles.planTime, { backgroundColor: `${color}18` }]}><Text style={[styles.planDate, { color }]}>{scheduled.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase()}</Text><Text style={[styles.planClock, { color: theme.text }]}>{formatPlannerTime(scheduled)}</Text></View><View style={{ flex: 1 }}><Text numberOfLines={1} style={[styles.planTitle, { color: theme.text }]}>{item.title}</Text><Text style={[styles.planMeta, { color: theme.textMuted }]}>{item.subject} · {item.type}{past ? ' · Completed' : ''}</Text></View><Pressable hitSlop={10} onPress={(event) => { event.stopPropagation(); onDelete(); }} style={[styles.planDelete, { backgroundColor: theme.surfaceMuted }]}><Ionicons name="trash-outline" color={theme.danger} size={17} /></Pressable></Pressable>;
+  return (
+    <Pressable
+      onPress={onEdit}
+      android_ripple={{ color: `${theme.brand}18` }}
+      style={({ pressed }) => [styles.plannerRow, { backgroundColor: theme.surfaceContainer, opacity: past ? 0.6 : pressed ? 0.85 : 1 }]}
+    >
+      <View style={[styles.planStripe, { backgroundColor: color }]} />
+      <View style={styles.planTime}>
+        <Text style={[styles.planClock, { color: theme.text }]}>{formatPlannerTime(scheduled)}</Text>
+        <Text style={[styles.planDate, { color: theme.textSubtle }]}>{scheduled.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text numberOfLines={1} style={[styles.planTitle, { color: theme.text }]}>{item.title}</Text>
+        <Text numberOfLines={1} style={[styles.planMeta, { color: theme.textMuted }]}>{item.subject} · {item.type}{past ? ' · Done' : ''}</Text>
+      </View>
+      <Pressable
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete ${item.title}`}
+        onPress={(event) => { event.stopPropagation(); onDelete(); }}
+        android_ripple={{ color: `${theme.danger}25`, borderless: true, radius: 19 }}
+        style={styles.planDelete}
+      >
+        <Ionicons name="trash-outline" color={theme.textMuted} size={18} />
+      </Pressable>
+    </Pressable>
+  );
 }
 
-function PlannerEditor({ visible, theme, focusSubjects, item, onClose, onSave, onDelete }: { visible: boolean; theme: AppTheme; focusSubjects: string[]; item: PlannerItem | null; onClose: () => void; onSave: (item: PlannerItem) => Promise<void>; onDelete?: () => void }) {
+function PlannerEditor({ visible, theme, focusSubjects, item, initialDate, onClose, onSave, onDelete }: { visible: boolean; theme: AppTheme; focusSubjects: string[]; item: PlannerItem | null; initialDate?: Date; onClose: () => void; onSave: (item: PlannerItem) => Promise<void>; onDelete?: () => void }) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<PlannerItem['type']>('Study session');
   const [subjectChoice, setSubjectChoice] = useState('Other');
@@ -1133,7 +1279,17 @@ function PlannerEditor({ visible, theme, focusSubjects, item, onClose, onSave, o
 
   useEffect(() => {
     if (!visible) return;
-    const nextDate = item?.scheduledAt ? new Date(item.scheduledAt) : new Date(Date.now() + 60 * 60 * 1000);
+    // Editing keeps its own time; a new task lands on the day the user tapped,
+    // an hour from now if that day is today, otherwise at a sensible 4pm.
+    let nextDate: Date;
+    if (item?.scheduledAt) {
+      nextDate = new Date(item.scheduledAt);
+    } else if (initialDate && !isSameDay(initialDate, new Date())) {
+      nextDate = new Date(initialDate);
+      nextDate.setHours(16, 0, 0, 0);
+    } else {
+      nextDate = new Date(Date.now() + 60 * 60 * 1000);
+    }
     nextDate.setSeconds(0, 0);
     setTitle(item?.title ?? '');
     setType(item?.type ?? 'Study session');
@@ -1143,7 +1299,7 @@ function PlannerEditor({ visible, theme, focusSubjects, item, onClose, onSave, o
     setScheduledAt(nextDate);
     setPicker(null);
     setError('');
-  }, [visible, item, focusSubjects]);
+  }, [visible, item, focusSubjects, initialDate]);
 
   const changeDateTime = (_event: DateTimePickerEvent, value?: Date) => {
     const selectedPicker = picker;
@@ -1330,41 +1486,6 @@ function ActionSheet({
     { icon: 'help-circle-outline' as const, label: 'Generate a quiz', copy: 'Test what you have learned', color: '#E98157', action: onQuiz },
   ];
   return <BottomSheet visible={visible} theme={theme} onClose={onClose}><Text style={[styles.sheetTitle, styles.actionSheetTitle, { color: theme.text }]}>What would you like to do?</Text><View style={styles.actionList}>{actions.map((item) => <Pressable key={item.label} onPress={item.action} style={[styles.actionRow, { backgroundColor: theme.surfaceMuted }]}><View style={[styles.actionIcon, { backgroundColor: `${item.color}20` }]}><Ionicons name={item.icon} color={item.color} size={21} /></View><View style={{ flex: 1 }}><Text style={[styles.actionTitle, { color: theme.text }]}>{item.label}</Text><Text style={[styles.actionCopy, { color: theme.textMuted }]}>{item.copy}</Text></View><Ionicons name="chevron-forward" color={theme.textMuted} size={18} /></Pressable>)}</View></BottomSheet>;
-}
-
-function LegacyUploadSheet({ visible, theme, subjects, onClose, onUploaded }: { visible: boolean; theme: AppTheme; subjects: string[]; onClose: () => void; onUploaded: (file: PickedFile, subject: string, subjectDescription?: string) => Promise<void> }) {
-  const [selectedName, setSelectedName] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState(subjects[0] ?? 'General study');
-  const [customSubject, setCustomSubject] = useState('');
-  const [customSubjectDescription, setCustomSubjectDescription] = useState('');
-  const [busy, setBusy] = useState(false);
-  const subjectOptions = Array.from(new Set([...(subjects.length ? subjects : ['General study']), 'Other subject']));
-
-  useEffect(() => {
-    if (!visible) return;
-    setSelectedName(null);
-    setSelectedSubject(subjects[0] ?? 'General study');
-    setCustomSubject('');
-    setCustomSubjectDescription('');
-  }, [visible]);
-
-  const chooseFile = async () => {
-    const materialSubject = selectedSubject === 'Other subject' ? customSubject.trim() : selectedSubject;
-    if (!materialSubject) {
-      Alert.alert('Choose a subject', 'Enter the subject this PDF is about before continuing.');
-      return;
-    }
-    try {
-      setBusy(true);
-      const file = await pickStudyFile();
-      if (file) {
-        await onUploaded(file, materialSubject, customSubjectDescription);
-        setSelectedName(file.name);
-      }
-    } catch (error) { Alert.alert('Could not open files', error instanceof Error ? error.message : 'Please try again.'); } finally { setBusy(false); }
-  };
-  const materialSubject = selectedSubject === 'Other subject' ? customSubject.trim() : selectedSubject;
-  return <BottomSheet visible={visible} theme={theme} onClose={onClose}><Text style={[styles.sheetTitle, { color: theme.text }]}>Upload a PDF</Text>{selectedName ? <View style={styles.uploadSuccessGroup}><View style={[styles.uploadComplete, { backgroundColor: theme.accentSoft }]}><Ionicons name="checkmark-circle" color={theme.success} size={28} /><View style={{ flex: 1 }}><Text style={[styles.actionTitle, { color: theme.text }]} numberOfLines={1}>{selectedName}</Text><Text style={[styles.actionCopy, { color: theme.success }]}>{materialSubject} · ready for Mentra study tools</Text></View></View><Pressable onPress={() => setSelectedName(null)} style={[styles.secondaryButton, { borderColor: theme.brand, backgroundColor: theme.brandSoft }]}><Ionicons name="add" color={theme.brand} size={18} /><Text style={[styles.secondaryButtonText, { color: theme.brand }]}>Add another PDF</Text></Pressable></View> : <><Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Choose the subject first so Mentra can organise this PDF and keep study help relevant.</Text><Text style={[styles.uploadSubjectLabel, { color: theme.text }]}>What subject is this material for?</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.uploadSubjectRow}>{subjectOptions.map((subject) => <Pressable key={subject} onPress={() => setSelectedSubject(subject)} style={[styles.uploadSubjectChip, { borderColor: selectedSubject === subject ? theme.brand : theme.line, backgroundColor: selectedSubject === subject ? theme.brandSoft : theme.surfaceMuted }]}><Text style={[styles.uploadSubjectText, { color: selectedSubject === subject ? theme.brand : theme.textMuted }]}>{subject}</Text>{selectedSubject === subject ? <Ionicons name="checkmark-circle" color={theme.brand} size={16} /> : null}</Pressable>)}</ScrollView>{selectedSubject === 'Other subject' ? <TextInput value={customSubject} onChangeText={setCustomSubject} placeholder="e.g. Government" placeholderTextColor={theme.textMuted} style={[styles.profileInput, { borderColor: theme.line, color: theme.text, backgroundColor: theme.surfaceMuted }]} /> : null}<Pressable disabled={busy || !materialSubject} onPress={chooseFile} style={[styles.dropZone, { borderColor: theme.brand, backgroundColor: theme.brandSoft, opacity: !materialSubject ? 0.55 : 1 }]}>{busy ? <ActivityIndicator color={theme.brand} /> : <><View style={[styles.dropIcon, { backgroundColor: theme.surface }]}><Ionicons name="cloud-upload-outline" color={theme.brand} size={25} /></View><Text style={[styles.dropTitle, { color: theme.text }]}>Choose a PDF</Text><Text style={[styles.dropBody, { color: theme.textMuted }]}>PDF documents only for now</Text></>}</Pressable><View style={styles.supportedRow}><Pill theme={theme} color={theme.surfaceMuted} textColor={theme.textMuted}>PDF</Pill></View></>}</BottomSheet>;
 }
 
 function UploadSheet({ visible, theme, subjects, onClose, onUploaded }: { visible: boolean; theme: AppTheme; subjects: string[]; onClose: () => void; onUploaded: (file: PickedFile, subject: string, subjectDescription?: string) => Promise<void> }) {
@@ -1675,7 +1796,6 @@ function BottomSheet({ visible, theme, onClose, children, tall = false }: { visi
 
 function FeatureLine({ icon, text, theme }: { icon: keyof typeof Ionicons.glyphMap; text: string; theme: AppTheme }) { return <View style={styles.featureLine}><View style={[styles.featureIcon, { backgroundColor: theme.brandSoft }]}><Ionicons name={icon} color={theme.brand} size={16} /></View><Text style={[styles.featureText, { color: theme.textMuted }]}>{text}</Text></View>; }
 function QuickAction({ icon, label, color, theme, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; color: string; theme: AppTheme; onPress: () => void }) { return <Pressable onPress={onPress} style={({ pressed }) => [styles.quickAction, { backgroundColor: theme.surface, borderColor: theme.line, opacity: pressed ? 0.76 : 1 }]}><View style={[styles.quickIcon, { backgroundColor: `${color}18` }]}><Ionicons name={icon} color={color} size={21} /></View><Text style={[styles.quickLabel, { color: theme.text }]}>{label}</Text></Pressable>; }
-function PlannerRow({ item, theme }: { item: (typeof plannerItems)[number]; theme: AppTheme }) { const color = item.type === 'Exam' ? theme.danger : item.type === 'Revision' ? theme.brand : theme.success; return <View style={[styles.plannerRow, { backgroundColor: theme.surface, borderColor: theme.line }]}><View style={[styles.planTime, { backgroundColor: `${color}18` }]}><Text style={[styles.planDate, { color }]}>{item.date === 'Today' ? 'TODAY' : item.date === 'Tomorrow' ? 'TMRW' : 'EXAM'}</Text><Text style={[styles.planClock, { color: theme.text }]}>{item.time}</Text></View><View style={{ flex: 1 }}><Text style={[styles.planTitle, { color: theme.text }]}>{item.title}</Text><Text style={[styles.planMeta, { color: theme.textMuted }]}>{item.subject} · {item.type}</Text></View><View style={[styles.planMarker, { backgroundColor: color }]} /></View>; }
 function StatBox({ icon, value, label, theme, color }: { icon: keyof typeof Ionicons.glyphMap; value: string; label: string; theme: AppTheme; color: string }) { return <View style={[styles.statBox, { backgroundColor: theme.surface, borderColor: theme.line }]}><Ionicons name={icon} color={color} size={19} /><Text style={[styles.statValue, { color: theme.text }]}>{value}</Text><Text style={[styles.statLabel, { color: theme.textMuted }]}>{label}</Text></View>; }
 function SettingRow({ icon, title, subtitle, right, theme }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle?: string; right: React.ReactNode; theme: AppTheme }) { return <View style={styles.settingRow}><View style={[styles.settingIcon, { backgroundColor: theme.surfaceMuted }]}><Ionicons name={icon} color={theme.brand} size={19} /></View><View style={{ flex: 1 }}><Text style={[styles.settingTitle, { color: theme.text }]}>{title}</Text>{subtitle ? <Text style={[styles.settingSubtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}</View>{right}</View>; }
 
@@ -1751,7 +1871,7 @@ const styles = StyleSheet.create({
   pdfViewer: { flex: 1, width: '100%', backgroundColor: 'transparent' },
   pdfError: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 9, padding: 22 },
   pdfErrorText: { textAlign: 'center', fontSize: 12.5, lineHeight: 18, fontWeight: '700' },
-  safeArea: { flex: 1 }, appShell: { flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center' }, screenContent: { width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 30, gap: 20 }, authFieldHint: { fontSize: 11, fontWeight: '700', marginTop: -3, marginLeft: 3 }, passwordChecklist: { borderRadius: 12, padding: 12, gap: 7, marginTop: 1 }, passwordChecklistTitle: { fontSize: 12, fontWeight: '800', marginBottom: 1 }, passwordCheck: { flexDirection: 'row', alignItems: 'center', gap: 7 }, passwordCheckText: { fontSize: 11.5, fontWeight: '600' }, authError: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, padding: 11 }, authErrorText: { flex: 1, fontSize: 11.5, lineHeight: 16, fontWeight: '600' }, profilePageHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, profileBack: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, profileForm: { borderRadius: 16, padding: 15, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(128,128,128,0.22)' }, profileEmptySubjects: { fontSize: 12.5, lineHeight: 18, fontWeight: '600' }, addSubjectsButton: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 4 }, addSubjectsText: { fontSize: 12.5, fontWeight: '700' }, profileFieldLabel: { fontSize: 11, fontWeight: '700', marginTop: 3 }, profileInput: { height: 49, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, fontSize: 13.5, fontWeight: '500' }, customSubjectForm: { gap: 9, marginTop: 16 }, profileDescriptionInput: { minHeight: 82, height: 82, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingTop: 12, fontSize: 13.5, fontWeight: '500', textAlignVertical: 'top' }, saveNotice: { fontSize: 11.5, fontWeight: '700', marginTop: 3 },
+  safeArea: { flex: 1 }, appShell: { flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center' }, screenContent: { width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: BOTTOM_NAV_CLEARANCE + 44, gap: 22 }, authFieldHint: { fontSize: 11, fontWeight: '700', marginTop: -3, marginLeft: 3 }, passwordChecklist: { borderRadius: 12, padding: 12, gap: 7, marginTop: 1 }, passwordChecklistTitle: { fontSize: 12, fontWeight: '800', marginBottom: 1 }, passwordCheck: { flexDirection: 'row', alignItems: 'center', gap: 7 }, passwordCheckText: { fontSize: 11.5, fontWeight: '600' }, authError: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, padding: 11 }, authErrorText: { flex: 1, fontSize: 11.5, lineHeight: 16, fontWeight: '600' }, profilePageHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, profileBack: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, profileForm: { borderRadius: 16, padding: 15, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(128,128,128,0.22)' }, profileEmptySubjects: { fontSize: 12.5, lineHeight: 18, fontWeight: '600' }, addSubjectsButton: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 4 }, addSubjectsText: { fontSize: 12.5, fontWeight: '700' }, profileFieldLabel: { fontSize: 11, fontWeight: '700', marginTop: 3 }, profileInput: { height: 49, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, fontSize: 13.5, fontWeight: '500' }, customSubjectForm: { gap: 9, marginTop: 16 }, profileDescriptionInput: { minHeight: 82, height: 82, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingTop: 12, fontSize: 13.5, fontWeight: '500', textAlignVertical: 'top' }, saveNotice: { fontSize: 11.5, fontWeight: '700', marginTop: 3 },
   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center' }, loadingMark: { width: 112, height: 112, borderRadius: 56, overflow: 'hidden', borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, loadingLogo: { width: 112, height: 112 }, loadingWordmark: { fontSize: 28, fontWeight: '800', letterSpacing: -0.7, marginTop: 24 }, loadingTagline: { fontSize: 13.5, fontWeight: '500', marginTop: 7 }, loadingIndicator: { marginTop: 28 },
   authScreen: { padding: 22, paddingTop: 18, paddingBottom: 38 }, authBack: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginBottom: 34 }, authMark: { width: 74, height: 74, borderRadius: 37, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 22, shadowColor: '#08143B', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 6 }, shadowRadius: 12, elevation: 2 }, authLogo: { width: 74, height: 74, transform: [{ translateY: -8 }] }, authTitle: { fontSize: 30, lineHeight: 37, fontWeight: '900', letterSpacing: -0.8, marginTop: 17 }, authBody: { fontSize: 14, lineHeight: 21, fontWeight: '600', marginTop: 10, marginBottom: 22 }, authWarning: { borderRadius: 14, padding: 12, flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 15 }, authWarningText: { flex: 1, fontSize: 11.5, lineHeight: 16, fontWeight: '700' }, authForm: { gap: 10 }, authInput: { height: 54, borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, fontSize: 14, fontWeight: '600' }, authNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 14, padding: 11 }, verifyHelp: { alignItems: 'center', marginTop: 24, gap: 7 }, verifyHelpText: { fontSize: 12.5, fontWeight: '700' }, verifyResend: { fontSize: 13, fontWeight: '900' }, authDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 21 }, authRule: { height: 1, flex: 1 }, authDividerText: { fontSize: 11.5, fontWeight: '700' }, authProviderRow: { flexDirection: 'row', gap: 10 }, authProvider: { height: 51, flex: 1, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, authModeButton: { alignSelf: 'center', paddingVertical: 22 }, authModeText: { fontSize: 13, fontWeight: '800' },
   welcome: { flex: 1, justifyContent: 'space-between' }, welcomeBackground: { width: '100%', height: '100%', resizeMode: 'cover' }, welcomeOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.58)' }, welcomeTop: { paddingHorizontal: 24, paddingTop: 26, alignItems: 'center' }, logoCrop: { width: 82, height: 82, borderRadius: 41, overflow: 'hidden', marginBottom: 14, backgroundColor: '#FFFFFF' }, logoImage: { width: 82, height: 82 }, welcomePill: { alignSelf: 'center', marginTop: 2 }, heroTitle: { fontSize: 36, lineHeight: 41, fontWeight: '800', letterSpacing: -1.1, marginTop: 17 }, heroBody: { fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 12, maxWidth: 315 },
@@ -1760,9 +1880,9 @@ const styles = StyleSheet.create({
   homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, headerActions: { flexDirection: 'row', alignItems: 'center', gap: 9 }, homeAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' }, homeAvatarText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' }, greeting: { fontSize: 13, fontWeight: '500' }, userName: { fontSize: 24, lineHeight: 31, fontWeight: '800', letterSpacing: -0.4 }, wave: { fontSize: 20 }, askBanner: { borderRadius: 16, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12 }, askIcon: { height: 42, width: 42, borderRadius: 21, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }, askCopy: { flex: 1 }, askTitle: { color: '#FFF', fontSize: 15, fontWeight: '800' }, askBody: { color: 'rgba(255,255,255,0.78)', fontSize: 11.5, fontWeight: '500', marginTop: 3 }, goalCard: { padding: 17, borderRadius: 16, borderWidth: 1 }, freshStartBody: { fontSize: 12.5, lineHeight: 19, fontWeight: '500', marginTop: 9 }, subjectFocusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 14 }, subjectFocusChip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, subjectFocusText: { fontSize: 11, fontWeight: '700' }, hiddenDemo: { display: 'none' }, goalTop: { flexDirection: 'row', justifyContent: 'space-between' }, goalEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1 }, goalTitle: { fontSize: 20, fontWeight: '800', marginTop: 6, letterSpacing: -0.3 }, streakBadge: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 4, height: 33 }, streakFire: { fontSize: 13 }, streakText: { fontSize: 11, fontWeight: '700' }, goalProgressRow: { marginTop: 22, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }, goalMetric: { fontSize: 15, fontWeight: '800' }, goalSubMetric: { fontSize: 11, fontWeight: '500' }, goalPercent: { fontSize: 14, fontWeight: '800' }, dayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 17 }, dayItem: { alignItems: 'center', gap: 5 }, dayDot: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14 }, dayLabel: { fontSize: 10, fontWeight: '700' }, continueCard: { minHeight: 103, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1 }, continueIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }, continueCopy: { flex: 1, gap: 6 }, continueTitle: { fontSize: 14, fontWeight: '800' }, continueMeta: { fontSize: 10.5, fontWeight: '500' }, quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, quickAction: { flexBasis: '47%', flexGrow: 1, minHeight: 82, padding: 12, borderRadius: 14, gap: 8, justifyContent: 'center', borderWidth: 1 }, quickIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }, quickLabel: { fontSize: 12, fontWeight: '700' }, listGap: { gap: 9 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, screenTitle: { fontSize: 28, lineHeight: 34, fontWeight: '900', letterSpacing: -0.7 }, screenSubtitle: { fontSize: 13, lineHeight: 19, fontWeight: '600', marginTop: 5 }, uploadCard: { borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 23, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, uploadIcon: { width: 45, height: 45, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, uploadCopy: { flex: 1 }, uploadTitle: { fontSize: 14, fontWeight: '900' }, uploadBody: { fontSize: 11.5, fontWeight: '600', marginTop: 4 }, filterRow: { gap: 8 }, filter: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 }, filterText: { fontSize: 12, fontWeight: '800' }, libraryLabel: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -5 }, libraryCount: { fontSize: 14, fontWeight: '900' }, sortText: { fontSize: 11.5, fontWeight: '700' }, deleteConfirmCard: { borderWidth: 1, borderRadius: 20, padding: 14, gap: 14 }, deleteConfirmCopy: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, deleteConfirmTitle: { fontSize: 13.5, fontWeight: '900' }, deleteConfirmBody: { fontSize: 11.5, lineHeight: 17, fontWeight: '600', marginTop: 3 }, deleteConfirmActions: { flexDirection: 'row', gap: 9 }, deleteCancelButton: { flex: 1, minHeight: 43, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, deleteCancelText: { fontSize: 12.5, fontWeight: '900' }, deleteConfirmButton: { flex: 1, minHeight: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, deleteConfirmButtonText: { color: '#FFF', fontSize: 12.5, fontWeight: '900' },
   practiceOptions: { gap: 11 }, practiceOption: { minHeight: 77, borderRadius: 22, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12 }, practiceOptionCopy: { flex: 1 }, practiceOptionTitle: { color: '#FFF', fontSize: 15, fontWeight: '900' }, practiceOptionBody: { color: 'rgba(255,255,255,0.78)', fontSize: 11.5, marginTop: 3, fontWeight: '600' }, flashcard: { minHeight: 255, borderRadius: 26, borderWidth: 1, overflow: 'hidden' }, flashTop: { flexDirection: 'row', justifyContent: 'space-between', padding: 17 }, flashDue: { fontSize: 11.5, fontWeight: '900' }, flashBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25 }, flashText: { fontSize: 20, lineHeight: 29, textAlign: 'center', fontWeight: '800', letterSpacing: -0.3 }, tapHint: { fontSize: 11.5, fontWeight: '600', marginTop: 17 }, flashFooter: { borderTopWidth: 1, padding: 13, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 7 }, flashFooterText: { fontSize: 11.5, fontWeight: '700' }, recallRow: { flexDirection: 'row', gap: 9 }, recallButton: { flex: 1, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, recallText: { fontSize: 13, fontWeight: '900' }, insightCard: { flexDirection: 'row', alignItems: 'center', gap: 12 }, insightIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, insightTitle: { fontSize: 13.5, fontWeight: '900', marginBottom: 3 }, insightText: { fontSize: 11.5, lineHeight: 16, fontWeight: '600' },
-  examCard: { borderRadius: 16, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13 }, examIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }, examDate: { fontSize: 10, letterSpacing: 0.8, fontWeight: '800' }, examTitle: { fontSize: 17, fontWeight: '800', marginTop: 5 }, examBody: { fontSize: 11.5, fontWeight: '500', marginTop: 3 }, calendarStrip: { borderRadius: 14, padding: 10, flexDirection: 'row', justifyContent: 'space-between', borderWidth: 1 }, calendarDay: { alignItems: 'center', gap: 5, minWidth: 36 }, calendarLabel: { fontSize: 10, fontWeight: '700' }, calendarDate: { height: 31, width: 31, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, calendarNumber: { fontSize: 13, fontWeight: '800' }, plannerCalendarDot: { width: 4, height: 4, borderRadius: 2 }, scheduleList: { gap: 9 }, plannerRow: { minHeight: 72, borderRadius: 14, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1 }, planTime: { width: 60, alignSelf: 'stretch', borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 3 }, planDate: { fontSize: 8.5, fontWeight: '800' }, planClock: { fontSize: 10.5, fontWeight: '800' }, planTitle: { fontSize: 13.5, fontWeight: '800' }, planMeta: { marginTop: 5, fontSize: 10.5, fontWeight: '500' }, planMarker: { height: 8, width: 8, borderRadius: 5 }, planDelete: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, planTip: { flexDirection: 'row', gap: 12, alignItems: 'center' }, planTipText: { fontSize: 12, lineHeight: 18, fontWeight: '500', flex: 1 }, plannerEditorContent: { paddingHorizontal: 12, paddingBottom: 28, gap: 12 }, plannerFieldLabel: { fontSize: 12.5, fontWeight: '900', marginTop: 5 }, plannerInput: { minHeight: 50, borderRadius: 14, borderWidth: 1, paddingHorizontal: 13, fontSize: 13.5, fontWeight: '600' }, plannerChoiceWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, plannerChoice: { minHeight: 39, borderRadius: 999, borderWidth: 1, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center' }, plannerChoiceText: { fontSize: 11.5, fontWeight: '800' }, plannerDateTimeRow: { flexDirection: 'row', gap: 9 }, plannerDateTimeButton: { flex: 1, minHeight: 65, borderRadius: 15, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 9 }, plannerDateTimeCaption: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 }, plannerDateTimeValue: { fontSize: 11.5, fontWeight: '800', marginTop: 3 }, plannerPickerWrap: { borderRadius: 15, borderWidth: 1, overflow: 'hidden', alignItems: 'center' }, plannerNotice: { borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 }, plannerNoticeText: { flex: 1, fontSize: 11.5, lineHeight: 17, fontWeight: '700' }, plannerDeleteButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, plannerDeleteText: { fontSize: 12.5, fontWeight: '900' },
+  examCard: { borderRadius: 16, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13 }, examIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }, examDate: { fontSize: 10, letterSpacing: 0.8, fontWeight: '800' }, examTitle: { fontSize: 17, fontWeight: '800', marginTop: 5 }, examBody: { fontSize: 11.5, fontWeight: '500', marginTop: 3 }, calendarCard: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md }, calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, calendarMonth: { ...type.subtitle }, calendarNav: { flexDirection: 'row', gap: 4 }, calendarWeekRow: { flexDirection: 'row' }, calendarWeekday: { ...type.label, flex: 1, textAlign: 'center' }, calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 4 }, calendarCell: { width: '14.2857%', alignItems: 'center', paddingVertical: 2, gap: 3 }, calendarCellInner: { height: 38, width: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, calendarCellText: { ...type.caption, fontSize: 14 }, calendarDotRow: { flexDirection: 'row', gap: 3, height: 5 }, calendarDot: { width: 5, height: 5, borderRadius: 2.5 }, scheduleList: { gap: 9 }, plannerRow: { minHeight: 74, borderRadius: radius.md, paddingRight: 6, flexDirection: 'row', alignItems: 'center', gap: 12, overflow: 'hidden' }, planStripe: { width: 4, alignSelf: 'stretch', borderTopLeftRadius: radius.md, borderBottomLeftRadius: radius.md }, planTime: { width: 62, alignItems: 'flex-start', justifyContent: 'center', gap: 2, paddingLeft: 10 }, planDate: { ...type.label, letterSpacing: 0.2 }, planClock: { ...type.bodyStrong, fontSize: 14 }, planTitle: { ...type.bodyStrong }, planMeta: { ...type.caption, fontWeight: '400', marginTop: 3 }, nextUpCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, padding: spacing.lg }, nextUpIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }, nextUpLabel: { ...type.label, opacity: 0.75 }, nextUpTitle: { ...type.subtitle, marginTop: 4 }, nextUpMeta: { ...type.caption, opacity: 0.8, marginTop: 2 }, planDelete: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, planTip: { flexDirection: 'row', gap: 12, alignItems: 'center' }, planTipText: { fontSize: 12, lineHeight: 18, fontWeight: '500', flex: 1 }, plannerEditorContent: { paddingHorizontal: 12, paddingBottom: 28, gap: 12 }, plannerFieldLabel: { fontSize: 12.5, fontWeight: '900', marginTop: 5 }, plannerInput: { minHeight: 50, borderRadius: 14, borderWidth: 1, paddingHorizontal: 13, fontSize: 13.5, fontWeight: '600' }, plannerChoiceWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, plannerChoice: { minHeight: 39, borderRadius: 999, borderWidth: 1, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center' }, plannerChoiceText: { fontSize: 11.5, fontWeight: '800' }, plannerDateTimeRow: { flexDirection: 'row', gap: 9 }, plannerDateTimeButton: { flex: 1, minHeight: 65, borderRadius: 15, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 9 }, plannerDateTimeCaption: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 }, plannerDateTimeValue: { fontSize: 11.5, fontWeight: '800', marginTop: 3 }, plannerPickerWrap: { borderRadius: 15, borderWidth: 1, overflow: 'hidden', alignItems: 'center' }, plannerNotice: { borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 }, plannerNoticeText: { flex: 1, fontSize: 11.5, lineHeight: 17, fontWeight: '700' }, plannerDeleteButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, plannerDeleteText: { fontSize: 12.5, fontWeight: '900' },
   profileHero: { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1 }, avatar: { height: 54, width: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#FFF', fontSize: 23, fontWeight: '800' }, profileName: { fontSize: 17, fontWeight: '800', marginBottom: 3 }, profileDetails: { fontSize: 11.5, fontWeight: '500', marginBottom: 6 }, insightGrid: { flexDirection: 'row', gap: 9 }, statBox: { flex: 1, minHeight: 103, borderRadius: 14, padding: 12, justifyContent: 'center', gap: 5, borderWidth: 1 }, statValue: { fontSize: 18, fontWeight: '800' }, statLabel: { fontSize: 10.5, fontWeight: '600' }, settingsCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1 }, settingRow: { minHeight: 68, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }, settingIcon: { height: 38, width: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, settingTitle: { fontSize: 13.5, fontWeight: '700' }, settingSubtitle: { fontSize: 10.5, marginTop: 3, fontWeight: '500' }, signOut: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E7EAF1', minHeight: 59, paddingHorizontal: 17, alignItems: 'center', flexDirection: 'row', gap: 11 }, signOutText: { fontSize: 13.5, fontWeight: '700' },
-  fab: { position: 'absolute', right: 18, width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.18, shadowOffset: { width: 0, height: 5 }, shadowRadius: 10, elevation: 5 }, keyboardAvoider: { flex: 1 }, modalWrap: { flex: 1, justifyContent: 'flex-end' }, backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.56)' }, sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderBottomWidth: 0, paddingHorizontal: 18, paddingBottom: 12, paddingTop: 10 }, sheetContent: { marginHorizontal: 8 }, tallSheetContent: { flex: 1, marginHorizontal: 0 }, handle: { width: 40, height: 4, borderRadius: 6, alignSelf: 'center', marginBottom: 14 }, closeSheet: { position: 'absolute', right: 15, top: 10, height: 36, width: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, sheetTitle: { fontSize: 19, lineHeight: 24, fontWeight: '800', letterSpacing: -0.2, paddingRight: 36 }, actionSheetTitle: { marginHorizontal: 0 }, sheetSubtitle: { fontSize: 12.5, lineHeight: 19, fontWeight: '500', marginTop: 8 }, actionList: { gap: 9, marginTop: 18, marginHorizontal: 0 }, actionRow: { minHeight: 67, borderRadius: 14, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11 }, actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }, actionTitle: { fontSize: 13.5, fontWeight: '700' }, actionCopy: { fontSize: 10.5, fontWeight: '500', marginTop: 3 }, dropZone: { minHeight: 168, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginTop: 19 }, dropIcon: { height: 52, width: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 9 }, dropTitle: { fontSize: 14, fontWeight: '700' }, dropBody: { fontSize: 11.5, fontWeight: '500', marginTop: 4 }, supportedRow: { flexDirection: 'row', justifyContent: 'center', gap: 7, marginTop: 13 }, uploadSubjectLabel: { fontSize: 12.5, fontWeight: '700', marginTop: 19 }, uploadSubjectRow: { gap: 8, paddingTop: 9, paddingBottom: 2 }, uploadSubjectChip: { minHeight: 37, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 5 }, uploadSubjectText: { fontSize: 11.5, fontWeight: '700' }, uploadSuccessGroup: { gap: 12 }, uploadComplete: { minHeight: 78, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 18 }, secondaryButton: { minHeight: 47, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, secondaryButtonText: { fontSize: 13, fontWeight: '700' },
+  fab: { position: 'absolute', right: 20, width: 58, height: 58, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.18, shadowOffset: { width: 0, height: 5 }, shadowRadius: 10, elevation: 5 }, keyboardAvoider: { flex: 1 }, modalWrap: { flex: 1, justifyContent: 'flex-end' }, backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.56)' }, sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderBottomWidth: 0, paddingHorizontal: 18, paddingBottom: 12, paddingTop: 10 }, sheetContent: { marginHorizontal: 8 }, tallSheetContent: { flex: 1, marginHorizontal: 0 }, handle: { width: 40, height: 4, borderRadius: 6, alignSelf: 'center', marginBottom: 14 }, closeSheet: { position: 'absolute', right: 15, top: 10, height: 36, width: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, sheetTitle: { fontSize: 19, lineHeight: 24, fontWeight: '800', letterSpacing: -0.2, paddingRight: 36 }, actionSheetTitle: { marginHorizontal: 0 }, sheetSubtitle: { fontSize: 12.5, lineHeight: 19, fontWeight: '500', marginTop: 8 }, actionList: { gap: 9, marginTop: 18, marginHorizontal: 0 }, actionRow: { minHeight: 67, borderRadius: 14, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11 }, actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }, actionTitle: { fontSize: 13.5, fontWeight: '700' }, actionCopy: { fontSize: 10.5, fontWeight: '500', marginTop: 3 }, dropZone: { minHeight: 168, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginTop: 19 }, dropIcon: { height: 52, width: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 9 }, dropTitle: { fontSize: 14, fontWeight: '700' }, dropBody: { fontSize: 11.5, fontWeight: '500', marginTop: 4 }, supportedRow: { flexDirection: 'row', justifyContent: 'center', gap: 7, marginTop: 13 }, uploadSubjectLabel: { fontSize: 12.5, fontWeight: '700', marginTop: 19 }, uploadSubjectRow: { gap: 8, paddingTop: 9, paddingBottom: 2 }, uploadSubjectChip: { minHeight: 37, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 5 }, uploadSubjectText: { fontSize: 11.5, fontWeight: '700' }, uploadSuccessGroup: { gap: 12 }, uploadComplete: { minHeight: 78, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 18 }, secondaryButton: { minHeight: 47, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, secondaryButtonText: { fontSize: 13, fontWeight: '700' },
   panelContent: { gap: 12 }, quizContent: { flex: 1, marginHorizontal: 16 }, quizScroll: { flex: 1, minHeight: 0 }, quizSubjectList: { gap: 9, marginTop: 18 }, quizSubjectOption: { minHeight: 52, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginHorizontal: 16, marginTop: 4, paddingRight: 39 }, onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }, onlineDot: { height: 6, width: 6, borderRadius: 3 }, onlineText: { fontSize: 10.5, fontWeight: '700' }, chatScroll: { flex: 1, minHeight: 0, marginTop: 15, marginHorizontal: 16 }, chatMessages: { flexGrow: 1, gap: 11, paddingBottom: 10 }, message: { maxWidth: '90%', borderRadius: 18, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1 }, userMessage: { alignSelf: 'flex-end', borderBottomRightRadius: 5 }, aiMessage: { alignSelf: 'flex-start', borderBottomLeftRadius: 5 }, richMessage: { gap: 5 }, messageText: { fontSize: 12.5, lineHeight: 19, fontWeight: '500' }, messageBold: { fontWeight: '900' }, messageHeading: { fontSize: 14.5, lineHeight: 21, fontWeight: '900', marginTop: 2 }, messageSpacer: { height: 3 }, messageListRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, messageBullet: { width: 5, height: 5, borderRadius: 3, marginTop: 7 }, messageNumber: { width: 18, fontSize: 12.5, lineHeight: 19, fontWeight: '900' }, messageListText: { flex: 1 }, citationList: { marginTop: 10, borderTopWidth: 1, paddingTop: 8, gap: 6 }, citation: { maxWidth: '100%', borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5 }, citationText: { flexShrink: 1, fontSize: 9.5, fontWeight: '800' }, typing: { alignSelf: 'flex-start', borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 7 }, typingText: { fontSize: 11.5, fontWeight: '700' }, aiError: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 14 }, aiErrorText: { flex: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 }, promptChips: { gap: 7, marginVertical: 10, maxHeight: 38 }, chatComposer: { paddingTop: 7, paddingBottom: 2 }, attachmentRow: { gap: 8, paddingHorizontal: 16, paddingBottom: 8 }, attachmentChip: { maxWidth: 240, minHeight: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, attachmentCopy: { flexShrink: 1, minWidth: 100 }, attachmentName: { fontSize: 10.5, fontWeight: '800' }, attachmentStatus: { fontSize: 9, fontWeight: '600', marginTop: 2 }, chatInput: { minHeight: 52, borderRadius: 18, borderWidth: 1, flexDirection: 'row', alignItems: 'center', padding: 5, marginHorizontal: 16 }, attachButton: { height: 40, width: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, chatTextInput: { flex: 1, maxHeight: 88, fontSize: 13, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 8 }, sendButton: { height: 40, width: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   solveInput: { minHeight: 105, borderRadius: 20, borderWidth: 1, marginTop: 17, padding: 12, flexDirection: 'row', alignItems: 'flex-start' }, solveText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '600', minHeight: 72 }, photoButton: { height: 38, width: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, solution: { marginTop: 14, borderRadius: 19, padding: 15, gap: 10 }, solutionLabel: { fontSize: 10, letterSpacing: 0.8, fontWeight: '900' }, solutionText: { fontSize: 12.5, lineHeight: 19, fontWeight: '600' }, solutionAnswer: { fontSize: 14, fontWeight: '900', marginTop: 3 }, materialHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 19 }, fileIconLarge: { width: 47, height: 47, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, readerInfo: { borderRadius: 19, padding: 15, flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, readerTitle: { fontSize: 14, fontWeight: '900' }, readerCopy: { fontSize: 12, lineHeight: 18, fontWeight: '600', marginTop: 4 }, readerDescription: { fontSize: 11.5, lineHeight: 17, fontWeight: '800', marginTop: 9 }, privacyContent: { gap: 10, paddingTop: 17, paddingBottom: 18 }, privacySection: { borderRadius: 17, padding: 14, gap: 6 }, privacyTitle: { fontSize: 13, fontWeight: '900' }, privacyBody: { fontSize: 12, lineHeight: 18, fontWeight: '600' }, privacyReview: { borderRadius: 17, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, privacyReviewText: { flex: 1, fontSize: 11.5, lineHeight: 17, fontWeight: '700' }, summaryEmpty: { alignItems: 'center', paddingVertical: 24 }, summaryArt: { height: 75, width: 75, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 17 }, summaryEmptyTitle: { fontSize: 19, fontWeight: '900' }, summaryEmptyText: { marginTop: 8, fontSize: 12.5, lineHeight: 19, textAlign: 'center', fontWeight: '600', maxWidth: 300 }, summaryLead: { marginTop: 13, marginBottom: 15, fontSize: 14, lineHeight: 22, fontWeight: '600' }, examNotes: { borderRadius: 17, padding: 13, flexDirection: 'row', gap: 10, marginBottom: 15 }, notesTitle: { fontSize: 12, fontWeight: '900', marginBottom: 3 }, notesText: { fontSize: 11.5, lineHeight: 17, fontWeight: '600' }, keyPointsTitle: { fontSize: 15, fontWeight: '900', marginBottom: 9 }, keyPoint: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }, keyPointText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
   quizHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 13 }, questionText: { fontSize: 19, lineHeight: 27, fontWeight: '900', marginTop: 24, letterSpacing: -0.25 }, choiceList: { gap: 9, marginTop: 18 }, choice: { minHeight: 59, borderRadius: 18, borderWidth: 1.2, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 }, choiceLetter: { height: 28, width: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, choiceLetterText: { fontSize: 11, fontWeight: '900' }, choiceText: { flex: 1, fontSize: 12.5, lineHeight: 17, fontWeight: '700' }, explanation: { borderRadius: 17, padding: 13, marginTop: 13 }, explanationTitle: { fontSize: 12, fontWeight: '900', marginBottom: 5 }, explanationText: { fontSize: 12, lineHeight: 18, fontWeight: '600' },
