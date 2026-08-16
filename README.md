@@ -22,6 +22,28 @@ The app works without configuration in local demo mode. Real AI calls are intent
 6. Set `GROQ_API_KEY` (and optionally `GROQ_MODEL`, `GROQ_BASE_URL`) as Supabase Edge Function
    secrets, then deploy `mentra-ai`. The mobile app deliberately never receives an LLM API key.
 
+### "Could not find the table 'public.materials' in the schema cache"
+
+`supabase/schema.sql` has not been applied to the project. Uploads fail at the metadata
+insert — the file reaches Storage, then the row that records it cannot be written, so the
+app deletes the orphaned file and reports the error. Grounded AI answers cannot work
+either, since the gateway looks materials up by id.
+
+Fix it in the Supabase dashboard: **SQL Editor → New query →** paste the whole of
+`supabase/schema.sql` **→ Run**. The script is idempotent, so it is safe on a project
+where Storage already exists, and it ends with `notify pgrst, 'reload schema'` so
+PostgREST picks the new tables up immediately instead of waiting for a restart.
+
+Verify with any authenticated client, or:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/materials?select=id&limit=1" \
+  -H "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY"
+```
+
+`200` means the schema is live. `404` means it is still missing.
+
 ### Applying pending migrations
 
 `supabase/migrations/20260816120000_widen_study_material_mime_types.sql` widens the

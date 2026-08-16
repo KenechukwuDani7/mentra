@@ -75,12 +75,23 @@ function resolvedMimeType(file: PickedFile) {
 }
 
 function uploadErrorMessage(error: unknown) {
-  const candidate = error as { message?: unknown; error?: unknown; statusCode?: unknown; status?: unknown } | null;
+  const candidate = error as { message?: unknown; error?: unknown; statusCode?: unknown; status?: unknown; code?: unknown } | null;
   const raw = candidate && typeof candidate === 'object'
     ? String(candidate.message ?? candidate.error ?? '')
     : String(error ?? '');
   const lowered = raw.toLowerCase();
   const status = String(candidate?.statusCode ?? candidate?.status ?? '');
+  const code = String(candidate?.code ?? '');
+
+  // PGRST205: the table is missing from PostgREST's schema cache, which in
+  // practice means the project's schema was never applied. Nothing the student
+  // can do about it, so name the cause rather than echoing the raw error.
+  if (code === 'PGRST205' || lowered.includes('schema cache')) {
+    return 'Mentra’s library is not set up on the server yet. Your file was not saved. Please contact Mentra support — the database schema needs to be applied.';
+  }
+  if (code === '42P01' || lowered.includes('does not exist')) {
+    return 'Mentra’s library is unavailable right now. Your file was not saved. Please try again later.';
+  }
 
   if (storageBucketIsMissing(error)) return 'Mentra storage is being set up. Please try again in a moment.';
   if (lowered.includes('row-level security') || status === '403') {
