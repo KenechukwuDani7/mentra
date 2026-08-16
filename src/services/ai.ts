@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import type { PickedFile } from '@/services/upload';
-import type { AiAnswer, GeneratedFlashcard, GeneratedQuiz, StudySolution } from '@/types';
+import type { AiAnswer, GeneratedFlashcard, GeneratedQuiz, StudySolution, StudySummary } from '@/types';
 
 const configuredGatewayUrl = process.env.EXPO_PUBLIC_AI_API_URL;
 const gatewayUrl = configuredGatewayUrl?.includes('YOUR_API_DOMAIN') ? undefined : configuredGatewayUrl;
@@ -78,11 +78,13 @@ function localAnswer(question: string, hasMaterial: boolean): AiAnswer {
 }
 
 export const ai = {
-  async summarize(materialId: string): Promise<AiAnswer> {
-    const remote = await post<AiAnswer>('/v1/materials/summarize', { materialId });
-    return remote ?? {
+  async summarize(materialId: string): Promise<StudySummary> {
+    const remote = await post<StudySummary>('/v1/materials/summarize', { materialId });
+    if (remote) return { ...remote, keyPoints: Array.isArray(remote.keyPoints) ? remote.keyPoints : [] };
+    return {
       answer:
         'This demo summary shows the desired format: a plain-language overview, the most important ideas, and short exam-ready notes. Once the AI gateway is connected, Mentra extracts the PDF, retrieves relevant pages, and creates this from the actual document.',
+      keyPoints: [],
       citations: [],
     };
   },

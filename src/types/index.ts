@@ -56,6 +56,12 @@ export type AiAnswer = {
   citations: string[];
 };
 
+/** A summary of one study material. Every field is drawn from that file. */
+export type StudySummary = AiAnswer & {
+  keyPoints: string[];
+  examNote?: string;
+};
+
 export type GeneratedQuiz = {
   title: string;
   questions: QuizQuestion[];

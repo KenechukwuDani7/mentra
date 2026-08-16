@@ -388,11 +388,38 @@ Deno.serve(async (request) => {
       const material = await getOwnedMaterial(admin, String(body.materialId ?? ''), userData.user.id);
       const pdf = await extractOwnedPdf(admin, material);
       const context = representativePages(pdf.pages);
-      const answer = await callGroq([
-        { role: 'system', content: `You are Mentra. Create a concise, accurate study summary in simple language using only the supplied study-file excerpts. Open with one or two sentences saying what the document is and who it is for, then walk through what matters most. Include key concepts, important definitions and short exam-focused notes, and cite important points with [Page N]. Say that this is a representative overview when the source has more than eight sections. ${VOICE_RULES}` },
+      const raw = await callGroq([
+        {
+          role: 'system',
+          content: `You are Mentra. Summarise a study file for a student, using only the supplied excerpts. Never use outside knowledge, and never fall back on a generic example from another subject — every word must come from this specific document.
+
+Return valid JSON only, with this exact shape:
+{"summary":"the main study summary","keyPoints":["a specific takeaway from this document"],"examNote":"one thing worth remembering for a test, drawn from this document","citations":[]}
+
+The summary opens with one or two sentences saying what the document is and who it is for, then walks through what matters most, citing important points with [Page N]. Say that it is a representative overview when the source has more than eight sections. Give 3 to 6 keyPoints, each a complete sentence a student could revise from. If the document does not suit an exam note — a CV or a letter, say — set examNote to an empty string rather than inventing one.
+
+Inside every string value: ${VOICE_RULES}`,
+        },
         { role: 'user', content: `Study file: ${material.title}\nTotal sections: ${pdf.totalPages}\n\n${context}` },
-      ]);
-      return json({ answer, citations: citations(material, pdf.totalPages) });
+      ], true);
+
+      const fallbackCitations = citations(material, pdf.totalPages);
+      try {
+        const parsed = parseJsonBlock(raw);
+        const keyPoints = Array.isArray(parsed.keyPoints)
+          ? parsed.keyPoints.map((point: unknown) => String(point).trim()).filter(Boolean).slice(0, 6)
+          : [];
+        return json({
+          answer: String(parsed.summary ?? '').trim() || raw,
+          keyPoints,
+          examNote: String(parsed.examNote ?? '').trim() || undefined,
+          citations: fallbackCitations,
+        });
+      } catch {
+        // A malformed JSON reply is still a usable summary; show it rather than
+        // failing the request outright.
+        return json({ answer: raw, keyPoints: [], citations: fallbackCitations });
+      }
     }
 
     if (path.endsWith('/v1/materials/quiz')) {
