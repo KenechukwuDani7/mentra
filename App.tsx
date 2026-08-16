@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
@@ -59,6 +60,8 @@ const LANGUAGE_STORAGE_KEY = 'mentra_learning_language';
 const PRACTICE_HISTORY_KEY = 'mentra_practice_history';
 const PLANNER_STORAGE_KEY = 'mentra_planner_items';
 const THEME_PREFERENCE_STORAGE_KEY = 'mentra_theme_preference';
+/** Which account the locally cached study data belongs to. */
+const DATA_OWNER_KEY = 'mentra_data_owner';
 const InterfaceLanguageContext = createContext('English');
 
 function Text({ children, ...props }: TextProps) {
@@ -231,6 +234,16 @@ function MentraApp() {
         const lastActiveAt = Number(await AsyncStorage.getItem(SESSION_ACTIVITY_KEY));
         const sessionIsRecent = session && Number.isFinite(lastActiveAt) && Date.now() - lastActiveAt <= SESSION_IDLE_LIMIT_MS;
         if (session && sessionIsRecent) {
+          // Local study data is device-wide, so anything left by a different
+          // account has to go before this student sees the app.
+          const previousOwner = await AsyncStorage.getItem(DATA_OWNER_KEY);
+          if (previousOwner && previousOwner !== session.user.id) {
+            const strandedPlan = await AsyncStorage.getItem(PLANNER_STORAGE_KEY);
+            const parsed = strandedPlan ? (JSON.parse(strandedPlan) as PlannerItem[]) : [];
+            await clearLocalStudyData(Array.isArray(parsed) ? parsed : []);
+          }
+          await AsyncStorage.setItem(DATA_OWNER_KEY, session.user.id);
+
           const metadata = session.user.user_metadata ?? {};
           setUserName(String(metadata.full_name ?? metadata.name ?? metadata.given_name ?? session.user.email?.split('@')[0] ?? 'Student'));
           if (Array.isArray(metadata.subjects)) setFocusSubjects(metadata.subjects.map(String));
@@ -240,8 +253,12 @@ function MentraApp() {
           await markSessionActive();
           nextStage = metadata.onboarding_completed ? 'app' : 'onboarding';
         } else if (session) {
+          // Idle past the limit. Treat it as a full sign-out rather than
+          // leaving the previous student's work on an unlocked device.
           await auth.signOut();
-          await AsyncStorage.removeItem(SESSION_ACTIVITY_KEY);
+          const strandedPlan = await AsyncStorage.getItem(PLANNER_STORAGE_KEY);
+          const parsed = strandedPlan ? (JSON.parse(strandedPlan) as PlannerItem[]) : [];
+          await clearLocalStudyData(Array.isArray(parsed) ? parsed : []);
         }
       } catch {
         nextStage = 'welcome';
@@ -272,6 +289,17 @@ function MentraApp() {
     const result = supabase ? await supabase.auth.getUser() : null;
     const user = result?.data.user;
     const metadata = user?.user_metadata ?? {};
+
+    // Signing in as somebody else on a shared phone must not inherit the
+    // previous student's library, schedule or practice history.
+    if (user) {
+      const previousOwner = await AsyncStorage.getItem(DATA_OWNER_KEY);
+      if (previousOwner && previousOwner !== user.id) {
+        await clearLocalStudyData(studyPlan);
+      }
+      await AsyncStorage.setItem(DATA_OWNER_KEY, user.id);
+    }
+
     const profileName = metadata.full_name ?? metadata.name ?? metadata.given_name ?? user?.email?.split('@')[0] ?? 'Student';
     setUserName(String(profileName));
     if (Array.isArray(metadata.subjects)) setFocusSubjects(metadata.subjects.map(String));
@@ -322,6 +350,57 @@ function MentraApp() {
   const openMaterial = (material: StudyMaterial) => {
     setSelectedMaterial(material);
     setSheet('reader');
+  };
+
+  /**
+   * Wipes every trace of one student's work from this device.
+   *
+   * Study data lives in device-wide AsyncStorage keys, so without this the
+   * next person on the same phone inherits the previous one's library,
+   * schedule and practice history — and their planner reminders keep firing.
+   * Theme preference is deliberately kept: it belongs to the device, not the
+   * account.
+   */
+  const clearLocalStudyData = async (plan: PlannerItem[]) => {
+    // Cancel first: once the items are gone their notification ids are lost
+    // and the alerts would keep arriving with nothing behind them.
+    await Promise.all(plan.map((item) => cancelStudyTaskNotification(item.notificationId)));
+
+    await AsyncStorage.multiRemove([
+      SESSION_ACTIVITY_KEY,
+      MATERIALS_STORAGE_KEY,
+      LANGUAGE_STORAGE_KEY,
+      PRACTICE_HISTORY_KEY,
+      PLANNER_STORAGE_KEY,
+      DATA_OWNER_KEY,
+    ]);
+
+    setStudentMaterials([]);
+    setPracticeHistory([]);
+    setStudyPlan([]);
+    setGeneratedFlashcards([]);
+    setFocusSubjects([]);
+    setSubjectDescriptions({});
+    setLearningLevel('');
+    setUserName('');
+    setAvatar(undefined);
+    setLanguage('English');
+    setChatMaterialIds([]);
+    setQuizMaterialId(null);
+    setSelectedMaterial(materials[0]!);
+    setActiveTab('Home');
+    setSheet('none');
+    setProfileOpen(false);
+  };
+
+  const signOutAndClearDevice = async () => {
+    try {
+      await auth.signOut();
+    } catch {
+      // Clear the device even if the network call fails.
+    }
+    await clearLocalStudyData(studyPlan);
+    setStage('welcome');
   };
 
   const chooseLanguage = async (nextLanguage: string) => {
@@ -387,7 +466,7 @@ function MentraApp() {
             onOpenLanguage={() => setSheet('language')}
             onOpenPrivacy={() => setSheet('privacy')}
             onOpenProfile={() => setProfileOpen(true)}
-            onSignOut={() => { void auth.signOut(); void AsyncStorage.removeItem(SESSION_ACTIVITY_KEY); setProfileOpen(false); setStage('welcome'); }}
+            onSignOut={() => { void signOutAndClearDevice(); }}
           />
         ) : null}
         {profileOpen ? (
@@ -456,25 +535,36 @@ function WelcomeScreen({
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar style="light" />
       <ImageBackground source={welcomeStudy} resizeMode="cover" imageStyle={styles.welcomeBackground} style={styles.welcome}>
-        <View style={styles.welcomeOverlay} pointerEvents="none" />
+        {/* A brand-tinted gradient instead of a flat black scrim: the photo
+            stays readable and the screen belongs to the same app as the rest. */}
+        <LinearGradient
+          colors={['rgba(12,30,66,0.34)', 'rgba(12,30,66,0.62)', 'rgba(9,22,50,0.9)']}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <View style={styles.welcomeTop}>
-          <View style={[styles.logoCrop, { backgroundColor: '#FFFFFF' }]}>
+          <View style={styles.logoCrop}>
             <Image source={logo} resizeMode="contain" style={styles.logoImage} />
           </View>
-          <Pill theme={theme} color="rgba(255,255,255,0.78)" textColor={theme.brand} style={styles.welcomePill}>
+          <Pill theme={theme} color="rgba(255,255,255,0.16)" textColor="#FFFFFF" style={styles.welcomePill}>
             Built for African learners
           </Pill>
           <Text style={[styles.heroTitle, { color: '#FFFFFF' }]}>Study smarter.{`\n`}Achieve more.</Text>
-          <Text style={[styles.heroBody, { color: 'rgba(255,255,255,0.86)' }]}>Your materials, an AI tutor, and a plan that keeps you moving forward.</Text>
+          <Text style={[styles.heroBody, { color: 'rgba(255,255,255,0.88)' }]}>Your materials, an AI tutor, and a plan that keeps you moving forward.</Text>
         </View>
-        <View style={[styles.welcomePanel, { backgroundColor: theme.surface }]}>
+        <View style={[styles.welcomePanel, { backgroundColor: theme.background }]}>
           <Text style={[styles.welcomeTitle, { color: theme.text }]}>Your learning, in one place.</Text>
-          <FeatureLine icon="book-outline" text="Understand any topic in simple language" theme={theme} />
-          <FeatureLine icon="documents-outline" text="Turn notes into flashcards and quizzes" theme={theme} />
-          <FeatureLine icon="calendar-outline" text="Stay ready for your next exam" theme={theme} />
-          <Pressable onPress={onContinue} style={({ pressed }) => [styles.primaryButton, { backgroundColor: theme.brand, opacity: pressed ? 0.82 : 1 }]}>
-            <Text style={styles.primaryButtonText}>Dive into Mentra</Text>
-            <Ionicons name="arrow-forward" color="#FFF" size={19} />
+          <FeatureLine icon="document" text="Understand any topic in simple language" theme={theme} />
+          <FeatureLine icon="flashcards" text="Turn notes into flashcards and quizzes" theme={theme} />
+          <FeatureLine icon="planner" text="Stay ready for your next exam" theme={theme} />
+          <Pressable
+            onPress={onContinue}
+            android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+            style={({ pressed }) => [styles.primaryButton, elevation(2, theme.shadow), { backgroundColor: theme.brand, marginTop: 6, opacity: pressed ? 0.9 : 1 }]}
+          >
+            <Text style={[styles.primaryButtonText, { color: theme.onBrand }]}>Get started</Text>
+            <Ionicons name="arrow-forward" color={theme.onBrand} size={19} />
           </Pressable>
         </View>
       </ImageBackground>
@@ -2031,7 +2121,14 @@ function BottomSheet({ visible, theme, onClose, children, tall = false }: { visi
   );
 }
 
-function FeatureLine({ icon, text, theme }: { icon: keyof typeof Ionicons.glyphMap; text: string; theme: AppTheme }) { return <View style={styles.featureLine}><View style={[styles.featureIcon, { backgroundColor: theme.brandSoft }]}><Ionicons name={icon} color={theme.brand} size={16} /></View><Text style={[styles.featureText, { color: theme.textMuted }]}>{text}</Text></View>; }
+function FeatureLine({ icon, text, theme }: { icon: Icon3DName; text: string; theme: AppTheme }) {
+  return (
+    <View style={styles.featureLine}>
+      <Icon3D name={icon} size={38} theme={theme} />
+      <Text style={[styles.featureText, { color: theme.textMuted }]}>{text}</Text>
+    </View>
+  );
+}
 function QuickAction({ icon, label, theme, onPress }: { icon: Icon3DName; label: string; theme: AppTheme; onPress: () => void }) {
   return (
     <Pressable
@@ -2123,8 +2220,8 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 }, appShell: { flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center' }, screenContent: { width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: BOTTOM_NAV_CLEARANCE + 44, gap: 22 }, authFieldHint: { fontSize: 13, fontWeight: '700', marginTop: -3, marginLeft: 3 }, passwordChecklist: { borderRadius: 12, padding: 12, gap: 7, marginTop: 1 }, passwordChecklistTitle: { fontSize: 14, fontWeight: '600', marginBottom: 1 }, passwordCheck: { flexDirection: 'row', alignItems: 'center', gap: 7 }, passwordCheckText: { fontSize: 13, fontWeight: '600' }, authError: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, padding: 11 }, authErrorText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: '600' }, profilePageHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, profileBack: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, profileForm: { borderRadius: 16, padding: 15, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(128,128,128,0.22)' }, profileEmptySubjects: { fontSize: 14, lineHeight: 20, fontWeight: '600' }, addSubjectsButton: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 4 }, addSubjectsText: { fontSize: 14, fontWeight: '700' }, profileFieldLabel: { fontSize: 13, fontWeight: '700', marginTop: 3 }, profileInput: { height: 49, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, fontSize: 15, fontWeight: '500' }, customSubjectForm: { gap: 9, marginTop: 16 }, profileDescriptionInput: { minHeight: 82, height: 82, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingTop: 12, fontSize: 15, fontWeight: '500', textAlignVertical: 'top' }, saveNotice: { fontSize: 13, fontWeight: '700', marginTop: 3 },
   
   authScreen: { padding: 22, paddingTop: 18, paddingBottom: 38 }, authBack: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginBottom: 34 }, authMark: { width: 74, height: 74, borderRadius: 37, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 22, shadowColor: '#08143B', shadowOpacity: 0.12, shadowOffset: { width: 0, height: 6 }, shadowRadius: 12, elevation: 2 }, authLogo: { width: 74, height: 74, transform: [{ translateY: -8 }] }, authTitle: { fontSize: 30, lineHeight: 44, fontWeight: '700', letterSpacing: -0.8, marginTop: 17 }, authBody: { fontSize: 15, lineHeight: 22, fontWeight: '600', marginTop: 10, marginBottom: 22 }, authWarning: { borderRadius: 14, padding: 12, flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 15 }, authWarningText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: '700' }, authForm: { gap: 10 }, authInput: { height: 54, borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, fontSize: 15, fontWeight: '600' }, authNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 14, padding: 11 }, verifyHelp: { alignItems: 'center', marginTop: 24, gap: 7 }, verifyHelpText: { fontSize: 14, fontWeight: '700' }, verifyResend: { fontSize: 15, fontWeight: '700' }, authDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 21 }, authRule: { height: 1, flex: 1 }, authDividerText: { fontSize: 13, fontWeight: '700' }, authProvider: { minHeight: 54, borderWidth: 1.5, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }, authModeButton: { alignSelf: 'center', paddingVertical: 22 }, authModeText: { fontSize: 15, fontWeight: '600' },
-  welcome: { flex: 1, justifyContent: 'space-between' }, welcomeBackground: { width: '100%', height: '100%', resizeMode: 'cover' }, welcomeOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.58)' }, welcomeTop: { paddingHorizontal: 24, paddingTop: 26, alignItems: 'center' }, logoCrop: { width: 82, height: 82, borderRadius: 41, overflow: 'hidden', marginBottom: 14, backgroundColor: '#FFFFFF' }, logoImage: { width: 82, height: 82 }, welcomePill: { alignSelf: 'center', marginTop: 2 }, heroTitle: { fontSize: 36, lineHeight: 52, fontWeight: '700', letterSpacing: -1.1, marginTop: 17 }, heroBody: { fontSize: 16, lineHeight: 23, textAlign: 'center', marginTop: 12, maxWidth: 315 },
-  welcomePanel: { padding: 22, borderTopLeftRadius: 24, borderTopRightRadius: 24, gap: 13 }, welcomeTitle: { fontSize: 19, fontWeight: '700', marginBottom: 3 }, featureLine: { flexDirection: 'row', alignItems: 'center', gap: 10 }, featureIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, featureText: { fontSize: 15, fontWeight: '500' }, primaryButton: { height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 }, primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700' }, socialText: { ...type.bodyStrong }, 
+  welcome: { flex: 1, justifyContent: 'space-between' }, welcomeBackground: { width: '100%', height: '100%', resizeMode: 'cover' }, welcomeTop: { paddingHorizontal: 24, paddingTop: 26, alignItems: 'center' }, logoCrop: { width: 76, height: 76, borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.lg, backgroundColor: '#FFFFFF' }, logoImage: { width: 82, height: 82 }, welcomePill: { alignSelf: 'center', marginTop: 2 }, heroTitle: { fontSize: 34, lineHeight: 42, fontWeight: '700', letterSpacing: -1, textAlign: 'center', marginTop: spacing.lg }, heroBody: { fontSize: 16, lineHeight: 23, textAlign: 'center', marginTop: 12, maxWidth: 315 },
+  welcomePanel: { padding: spacing.xxl, paddingBottom: spacing.xl, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, gap: spacing.lg }, welcomeTitle: { ...type.title, marginBottom: 2 }, featureLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, featureIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, featureText: { ...type.body, flex: 1 }, primaryButton: { height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16 }, primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700' }, socialText: { ...type.bodyStrong }, 
   onboarding: { flex: 1 }, onboardingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 14 }, wordmark: { fontSize: 21, fontWeight: '700', letterSpacing: -0.7 }, stepCount: { fontSize: 14, fontWeight: '700' }, stepper: { flexDirection: 'row', gap: 5, paddingHorizontal: 22, marginTop: 18 }, stepLine: { height: 4, flex: 1, borderRadius: 5 }, onboardingContent: { padding: 22, paddingTop: 37 }, onboardingTitle: { fontSize: 31, lineHeight: 45, fontWeight: '700', letterSpacing: -0.8, marginTop: 17 }, onboardingBody: { fontSize: 15, lineHeight: 22, marginTop: 12, marginBottom: 25 }, nameInputWrap: { height: 57, borderRadius: 17, borderWidth: 1, paddingHorizontal: 16, alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 12 }, nameInput: { flex: 1, fontSize: 15, fontWeight: '600' }, optionGrid: { gap: 10 }, option: { minHeight: 55, borderRadius: 17, borderWidth: 1, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, optionText: { fontSize: 15, fontWeight: '600' },
   homeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md }, headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, homeAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, homeAvatarText: { ...type.subtitle, fontWeight: '700' }, greeting: { ...type.caption, fontWeight: '400' }, userName: { ...type.headline, marginTop: 2 }, askBanner: { borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md }, askIcon: { height: 44, width: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, askCopy: { flex: 1 }, askTitle: { ...type.subtitle }, askBody: { ...type.caption, fontWeight: '400', opacity: 0.82, marginTop: 3 }, goalCard: { padding: spacing.xl, borderRadius: radius.lg }, freshStartBody: { ...type.caption, fontWeight: '400', lineHeight: 20, marginTop: 8 }, subjectFocusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: spacing.lg }, subjectFocusChip: { borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 }, subjectFocusText: { ...type.caption, fontWeight: '600' }, goalEyebrow: { ...type.label }, goalTitle: { ...type.title, marginTop: 8 }, continueCard: { borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md }, continueIcon: { width: 48, height: 48, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' }, continueCopy: { flex: 1, gap: 5 }, continueTitle: { ...type.bodyStrong }, continueMeta: { ...type.caption, fontWeight: '400' }, quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, quickAction: { flexBasis: '47%', flexGrow: 1, minHeight: 96, padding: spacing.lg, borderRadius: radius.md, gap: spacing.md, justifyContent: 'center', overflow: 'hidden' }, quickIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }, quickLabel: { ...type.caption, fontWeight: '600' }, listGap: { gap: spacing.sm }, nextTaskCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.md, padding: spacing.md }, nextTaskIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' }, nextTaskLabel: { ...type.label }, nextTaskTitle: { ...type.bodyStrong, marginTop: 3 }, nextTaskTime: { ...type.bodyStrong },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, screenTitle: { fontSize: 28, lineHeight: 41, fontWeight: '700', letterSpacing: -0.7 }, screenSubtitle: { fontSize: 15, lineHeight: 22, fontWeight: '600', marginTop: 5 }, uploadCard: { borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 23, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, uploadIcon: { width: 45, height: 45, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, uploadCopy: { flex: 1 }, uploadTitle: { fontSize: 15, fontWeight: '700' }, uploadBody: { fontSize: 13, fontWeight: '600', marginTop: 4 }, filterRow: { gap: 8 }, filter: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 }, filterText: { fontSize: 14, fontWeight: '600' }, libraryLabel: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -5 }, libraryCount: { fontSize: 15, fontWeight: '700' }, sortText: { fontSize: 13, fontWeight: '700' }, deleteConfirmCard: { borderWidth: 1, borderRadius: 20, padding: 14, gap: 14 }, deleteConfirmCopy: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, deleteConfirmTitle: { fontSize: 15, fontWeight: '700' }, deleteConfirmBody: { fontSize: 13, lineHeight: 19, fontWeight: '600', marginTop: 3 }, deleteConfirmActions: { flexDirection: 'row', gap: 9 }, deleteCancelButton: { flex: 1, minHeight: 43, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, deleteCancelText: { fontSize: 14, fontWeight: '700' }, deleteConfirmButton: { flex: 1, minHeight: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, deleteConfirmButtonText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
