@@ -63,6 +63,22 @@ const MATERIAL_MIME_TYPES = [
   'image/bmp',
   'application/octet-stream',
 ];
+/**
+ * Shared voice rules for every prose response.
+ *
+ * Without these the model reaches for report-style markdown — `###` headings,
+ * `**bold**`, `---` rules and pipe tables — which reads as a generated document
+ * rather than a tutor talking to a student. Simple bullets and numbered lines
+ * are still allowed because the app renders those as real list UI.
+ */
+const VOICE_RULES = [
+  'Write the way a patient tutor speaks out loud: short paragraphs, plain sentences, no filler.',
+  'Never use markdown headings (#, ##, ###), bold or italic markers (**, __, *, _), horizontal rules (---), pipe tables, or backticks.',
+  'When you need a list, use simple lines starting with "- ", or number them "1. ", "2. ". Keep each line to one idea.',
+  'Introduce a new topic with a short lead-in sentence instead of a heading.',
+  'Prefer concrete examples a student would recognise over abstract definitions.',
+].join(' ');
+
 const STOP_WORDS = new Set([
   'about', 'after', 'again', 'also', 'because', 'been', 'before', 'being',
   'could', 'does', 'from', 'have', 'into', 'just', 'more', 'most', 'other',
@@ -339,7 +355,7 @@ Deno.serve(async (request) => {
         const pdf = await extractOwnedPdf(admin, material);
         const context = relevantPages(pdf.pages, question);
         const answer = await callGroq([
-          { role: 'system', content: 'You are Mentra, a clear and encouraging academic tutor. Answer only from the supplied study-file excerpts. Cite page or section numbers using the [Page N] markers. If the excerpts do not contain the answer, say so clearly.' },
+          { role: 'system', content: `You are Mentra, a clear and encouraging academic tutor. Answer only from the supplied study-file excerpts. Cite page or section numbers using the [Page N] markers. If the excerpts do not contain the answer, say so clearly. ${VOICE_RULES}` },
           { role: 'user', content: `Study file: ${material.title}\n\n${context}\n\nStudent question: ${question}` },
         ]);
         return json({ answer, citations: citations(material, pdf.totalPages) });
@@ -347,7 +363,7 @@ Deno.serve(async (request) => {
 
       const studyContext = body.studyContext && typeof body.studyContext === 'object' ? JSON.stringify(body.studyContext) : 'Not provided';
       const answer = await callGroq([
-        { role: 'system', content: 'You are Mentra, an accurate and encouraging academic tutor for African students. Give direct, age-appropriate explanations with practical examples. Do not invent sources or facts, and say when you are uncertain.' },
+        { role: 'system', content: `You are Mentra, an accurate and encouraging academic tutor for African students. Give direct, age-appropriate explanations with practical examples. Do not invent sources or facts, and say when you are uncertain. ${VOICE_RULES}` },
         { role: 'user', content: `Student context: ${studyContext}\n\nQuestion: ${question}` },
       ]);
       return json({ answer, citations: [] });
@@ -373,7 +389,7 @@ Deno.serve(async (request) => {
       const pdf = await extractOwnedPdf(admin, material);
       const context = representativePages(pdf.pages);
       const answer = await callGroq([
-        { role: 'system', content: 'You are Mentra. Create a concise, accurate study summary in simple language using only the supplied study-file excerpts. Include key concepts, important definitions, short exam-focused notes, and cite important points with [Page N]. Mention that this is a representative overview when the source has more than eight sections.' },
+        { role: 'system', content: `You are Mentra. Create a concise, accurate study summary in simple language using only the supplied study-file excerpts. Open with one or two sentences saying what the document is and who it is for, then walk through what matters most. Include key concepts, important definitions and short exam-focused notes, and cite important points with [Page N]. Say that this is a representative overview when the source has more than eight sections. ${VOICE_RULES}` },
         { role: 'user', content: `Study file: ${material.title}\nTotal sections: ${pdf.totalPages}\n\n${context}` },
       ]);
       return json({ answer, citations: citations(material, pdf.totalPages) });
@@ -415,7 +431,7 @@ Deno.serve(async (request) => {
       const educationLevel = String(body.educationLevel ?? 'student').trim();
       if (!question && !imageData) return error('Enter or photograph a maths or science question first.');
       if (imageData.length > 20_000_000) return error('That image is too large. Please choose a smaller or cropped image.');
-      const instructions = `Solve the problem accurately for a learner at this level: ${educationLevel}. First identify exactly what is being asked. Explain the method thoroughly in simple language, show every meaningful calculation with correct notation and units, and verify the result where possible. If an image is supplied, use OCR to read it and mention any unclear part instead of guessing. Return valid JSON only with this exact shape: {"answer":"a helpful overview of the method","steps":["detailed numbered step without the number prefix"],"finalAnswer":"the final result with units where relevant","check":"a short verification or reason the answer makes sense","tips":["common mistake or revision tip"],"videoQuery":"a concise YouTube search phrase for learning this exact topic","citations":[]}. Provide 4 to 12 steps when the problem needs them.`;
+      const instructions = `Solve the problem accurately for a learner at this level: ${educationLevel}. First identify exactly what is being asked. Explain the method thoroughly in simple language, show every meaningful calculation with correct notation and units, and verify the result where possible. If an image is supplied, use OCR to read it and mention any unclear part instead of guessing. Return valid JSON only with this exact shape: {"answer":"a helpful overview of the method","steps":["detailed numbered step without the number prefix"],"finalAnswer":"the final result with units where relevant","check":"a short verification or reason the answer makes sense","tips":["common mistake or revision tip"],"videoQuery":"a concise YouTube search phrase for learning this exact topic","citations":[]}. Provide 4 to 12 steps when the problem needs them. Inside every string value: ${VOICE_RULES}`;
       const userContent: ChatMessage['content'] = imageData ? [
         { type: 'text', text: question || 'Read the problem in this image and solve it step by step.' },
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageData}` } },
