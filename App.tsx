@@ -26,6 +26,8 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Avatar, AvatarPicker, type AvatarValue } from '@/components/avatar';
+import { Icon3D, type Icon3DName } from '@/components/icon-3d';
 import { BOTTOM_NAV_CLEARANCE, BottomNav } from '@/components/bottom-nav';
 import { HomeSkeleton, SplashScreen } from '@/components/loading';
 import { MaterialRow } from '@/components/material-row';
@@ -40,7 +42,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { auth } from '@/services/auth';
 import { ai } from '@/services/ai';
 import { cancelStudyTaskNotification, scheduleStudyTaskNotification } from '@/services/notifications';
-import { pickChatAttachment, pickQuestionImage, pickStudyFile, uploadStudyMaterial, type PickedFile } from '@/services/upload';
+import { pickAvatarPhoto, pickChatAttachment, pickQuestionImage, pickStudyFile, uploadStudyMaterial, type PickedFile } from '@/services/upload';
 import { elevation, radius, spacing, themes, type, type AppTheme } from '@/theme/tokens';
 import type { AiAnswer, ChatMessage, GeneratedFlashcard, GeneratedQuiz, PlannerItem, PracticeActivity, RootTab, StudyMaterial, StudySolution, StudySummary, ThemeMode } from '@/types';
 
@@ -105,6 +107,7 @@ function MentraApp() {
   const [practiceHistory, setPracticeHistory] = useState<PracticeActivity[]>([]);
   const [generatedFlashcards, setGeneratedFlashcards] = useState<GeneratedFlashcard[]>([]);
   const [quizMaterialId, setQuizMaterialId] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<AvatarValue>(undefined);
   const [studyPlan, setStudyPlan] = useState<PlannerItem[]>([]);
   const [studyPlanReady, setStudyPlanReady] = useState(false);
   const themeMode: ThemeMode = themePreference === 'system' ? (systemTheme === 'dark' ? 'dark' : 'light') : themePreference;
@@ -233,6 +236,7 @@ function MentraApp() {
           if (Array.isArray(metadata.subjects)) setFocusSubjects(metadata.subjects.map(String));
           if (metadata.subject_descriptions && typeof metadata.subject_descriptions === 'object') setSubjectDescriptions(metadata.subject_descriptions as Record<string, string>);
           setLearningLevel(String(metadata.education_level ?? ''));
+          if (typeof metadata.avatar === 'string') setAvatar(metadata.avatar);
           await markSessionActive();
           nextStage = metadata.onboarding_completed ? 'app' : 'onboarding';
         } else if (session) {
@@ -273,6 +277,7 @@ function MentraApp() {
     if (Array.isArray(metadata.subjects)) setFocusSubjects(metadata.subjects.map(String));
     if (metadata.subject_descriptions && typeof metadata.subject_descriptions === 'object') setSubjectDescriptions(metadata.subject_descriptions as Record<string, string>);
     setLearningLevel(String(metadata.education_level ?? ''));
+    if (typeof metadata.avatar === 'string') setAvatar(metadata.avatar);
   };
 
   const addStudentMaterial = async (file: PickedFile, subject: string, subjectDescription?: string) => {
@@ -300,6 +305,18 @@ function MentraApp() {
 
   const deleteStudentMaterial = (material: StudyMaterial) => {
     setStudentMaterials((current) => current.filter((item) => item.id !== material.id));
+  };
+
+  /** Records how far through a file the student has read. Never moves backwards. */
+  const recordReadingProgress = (materialId: string, page: number, pages: number) => {
+    if (!pages || page < 1) return;
+    setStudentMaterials((current) => current.map((item) => (
+      item.id === materialId && page > (item.readPage ?? 0)
+        ? { ...item, readPage: page, readPages: pages }
+        : item.id === materialId && item.readPages !== pages
+          ? { ...item, readPages: pages }
+          : item
+    )));
   };
 
   const openMaterial = (material: StudyMaterial) => {
@@ -342,6 +359,7 @@ function MentraApp() {
             focusSubjects={focusSubjects}
             recentMaterials={studentMaterials}
             nextTask={nextStudyTask}
+            avatar={avatar}
             onOpenChat={() => { setChatMaterialIds([]); setSheet('chat'); }}
             onOpenActions={() => setSheet('actions')}
             onOpenSummary={openMaterial}
@@ -378,6 +396,8 @@ function MentraApp() {
             userName={userName}
             focusSubjects={focusSubjects}
             subjectDescriptions={subjectDescriptions}
+            avatar={avatar}
+            onChangeAvatar={setAvatar}
             onChangeName={setUserName}
             onChangeSubjects={setFocusSubjects}
             onChangeSubjectDescriptions={setSubjectDescriptions}
@@ -408,7 +428,7 @@ function MentraApp() {
       <UploadSheet visible={sheet === 'upload'} theme={theme} subjects={focusSubjects} onClose={() => setSheet('none')} onUploaded={async (file, subject, description) => { await addStudentMaterial(file, subject, description); }} />
       <PracticeCreateSheet visible={sheet === 'practiceCreate'} theme={theme} subjects={focusSubjects} onClose={() => setSheet('none')} onUploaded={addStudentMaterial} onBuildQuiz={(materialId) => { setQuizMaterialId(materialId); setSheet('quiz'); }} onFlashcards={(cards, title, subject) => { setGeneratedFlashcards(cards); addPracticeActivity({ type: 'Flashcards', title, subject, detail: `${cards.length} cards generated` }); setSheet('flashcards'); }} />
       <FlashcardSheet visible={sheet === 'flashcards'} theme={theme} cards={generatedFlashcards} onClose={() => setSheet('none')} />
-      <ReaderSheet visible={sheet === 'reader'} material={selectedMaterial} theme={theme} onClose={() => setSheet('none')} onOpenStudyTools={() => setSheet('summary')} />
+      <ReaderSheet visible={sheet === 'reader'} material={selectedMaterial} theme={theme} onClose={() => setSheet('none')} onOpenStudyTools={() => setSheet('summary')} onProgress={recordReadingProgress} />
       <ChatSheet visible={sheet === 'chat'} theme={theme} focusSubjects={focusSubjects} subjectDescriptions={subjectDescriptions} language={language} materialIds={chatMaterialIds} onAttach={addStudentMaterial} onClose={() => setSheet('none')} />
       <SolverSheet visible={sheet === 'solver'} theme={theme} learningLevel={learningLevel} onSolved={(question) => addPracticeActivity({ type: 'Solver', title: 'Solved question', subject: 'Maths & science', detail: question || 'Solved from an image' })} onClose={() => setSheet('none')} />
       <SummarySheet
@@ -820,6 +840,7 @@ function HomeScreen({
   focusSubjects,
   recentMaterials,
   nextTask,
+  avatar,
   onOpenChat,
   onOpenActions,
   onOpenSummary,
@@ -834,6 +855,7 @@ function HomeScreen({
   focusSubjects: string[];
   recentMaterials: StudyMaterial[];
   nextTask?: PlannerItem;
+  avatar: AvatarValue;
   onOpenChat: () => void;
   onOpenActions: () => void;
   onOpenSummary: (material: StudyMaterial) => void;
@@ -844,6 +866,10 @@ function HomeScreen({
 }) {
   const copy = getInterfaceCopy(language);
   const [currentHour, setCurrentHour] = useState(() => new Date().getHours());
+  const continueMaterial = recentMaterials[0];
+  const continuePercent = continueMaterial?.readPages && continueMaterial.readPage
+    ? Math.min(100, Math.round((continueMaterial.readPage / continueMaterial.readPages) * 100))
+    : null;
 
   useEffect(() => {
     const refreshGreeting = () => setCurrentHour(new Date().getHours());
@@ -865,9 +891,9 @@ function HomeScreen({
             accessibilityLabel="Open profile"
             onPress={onOpenProfile}
             android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: true, radius: 22 }}
-            style={({ pressed }) => [styles.homeAvatar, { backgroundColor: theme.brand, opacity: pressed ? 0.85 : 1 }]}
+            style={({ pressed }) => [styles.homeAvatar, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <Text style={[styles.homeAvatarText, { color: theme.onBrand }]}>{(userName || 'S').charAt(0).toUpperCase()}</Text>
+            <Avatar value={avatar} name={userName} size={44} theme={theme} />
           </Pressable>
         </View>
       </View>
@@ -933,7 +959,16 @@ function HomeScreen({
             <View style={styles.continueCopy}>
               <Pill theme={theme} color={theme.violetContainer} textColor={theme.violet}>{recentMaterials[0]!.subject}</Pill>
               <Text numberOfLines={1} style={[styles.continueTitle, { color: theme.text }]}>{recentMaterials[0]!.title}</Text>
-              <Text numberOfLines={1} style={[styles.continueMeta, { color: theme.textMuted }]}>Summaries, flashcards, and questions are ready</Text>
+              {continuePercent !== null ? (
+                <>
+                  <ProgressBar value={continuePercent} theme={theme} color={theme.violet} />
+                  <Text numberOfLines={1} style={[styles.continueMeta, { color: theme.textMuted }]}>
+                    {continuePercent >= 100 ? 'Finished — revise it any time' : `${continuePercent}% read · pick up where you stopped`}
+                  </Text>
+                </>
+              ) : (
+                <Text numberOfLines={1} style={[styles.continueMeta, { color: theme.textMuted }]}>Summaries, flashcards, and questions are ready</Text>
+              )}
             </View>
             <Ionicons name="play-circle" color={theme.brand} size={34} />
           </Pressable>
@@ -943,10 +978,10 @@ function HomeScreen({
       <View>
         <SectionHeader title={copy.quickActions} theme={theme} />
         <View style={styles.quickGrid}>
-          <QuickAction icon="cloud-upload-outline" label={copy.upload} color={theme.brand} container={theme.brandContainer} theme={theme} onPress={onOpenActions} />
-          <QuickAction icon="albums-outline" label={copy.flashcards} color={theme.amber} container={theme.amberContainer} theme={theme} onPress={onOpenPractice} />
-          <QuickAction icon="help-circle-outline" label={copy.takeQuiz} color={theme.teal} container={theme.tealContainer} theme={theme} onPress={onOpenPractice} />
-          <QuickAction icon="calendar-outline" label={copy.planStudy} color={theme.violet} container={theme.violetContainer} theme={theme} onPress={onOpenPlanner} />
+          <QuickAction icon="upload" label={copy.upload} theme={theme} onPress={onOpenActions} />
+          <QuickAction icon="flashcards" label={copy.flashcards} theme={theme} onPress={onOpenPractice} />
+          <QuickAction icon="quiz" label={copy.takeQuiz} theme={theme} onPress={onOpenPractice} />
+          <QuickAction icon="planner" label={copy.planStudy} theme={theme} onPress={onOpenPlanner} />
         </View>
       </View>
 
@@ -1354,18 +1389,22 @@ function ProfileScreen({
   userName,
   focusSubjects,
   subjectDescriptions,
+  avatar,
   onChangeName,
   onChangeSubjects,
   onChangeSubjectDescriptions,
+  onChangeAvatar,
   onBack,
 }: {
   theme: AppTheme;
   userName: string;
   focusSubjects: string[];
   subjectDescriptions: Record<string, string>;
+  avatar: AvatarValue;
   onChangeName: (value: string) => void;
   onChangeSubjects: (subjects: string[]) => void;
   onChangeSubjectDescriptions: (value: Record<string, string>) => void;
+  onChangeAvatar: (value: AvatarValue) => void;
   onBack: () => void;
 }) {
   const [fullName, setFullName] = useState(userName || 'Student');
@@ -1383,6 +1422,15 @@ function ProfileScreen({
   useEffect(() => setFullName(userName || 'Student'), [userName]);
   useEffect(() => setSubjects(focusSubjects), [focusSubjects]);
   useEffect(() => setDescriptions(subjectDescriptions), [subjectDescriptions]);
+  const choosePhoto = async () => {
+    try {
+      const photo = await pickAvatarPhoto();
+      if (photo) { onChangeAvatar(photo.uri); setSaved(false); }
+    } catch (caught) {
+      Alert.alert('Photo access needed', caught instanceof Error ? caught.message : 'Please try again.');
+    }
+  };
+
   const toggleSubject = (subject: string) => {
     setSubjects((current) => current.includes(subject) ? current.filter((item) => item !== subject) : [...current, subject]);
     setSaved(false);
@@ -1393,7 +1441,7 @@ function ProfileScreen({
     if (!nextName || saving) return;
     setSaving(true);
     try {
-      await auth.updateProfile({ fullName: nextName, school: school.trim(), country: country.trim(), subjects, subjectDescriptions: descriptions });
+      await auth.updateProfile({ fullName: nextName, school: school.trim(), country: country.trim(), subjects, subjectDescriptions: descriptions, avatar: avatar ?? '' });
     } catch {
       // Keep the profile editable before a live account is connected.
     } finally {
@@ -1410,10 +1458,37 @@ function ProfileScreen({
         <Pressable accessibilityRole="button" accessibilityLabel="Back to home" onPress={onBack} style={[styles.profileBack, { backgroundColor: theme.surfaceMuted }]}><Ionicons name="arrow-back" size={19} color={theme.text} /></Pressable>
         <View><Text style={[styles.screenTitle, { color: theme.text }]}>Profile</Text><Text style={[styles.screenSubtitle, { color: theme.textMuted }]}>Your study identity and progress.</Text></View>
       </View>
-      <View style={[styles.profileHero, { backgroundColor: theme.surfaceContainer, borderColor: 'transparent' }]}> 
-        <View style={[styles.avatar, { backgroundColor: theme.brand }]}><Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text></View>
+      <View style={[styles.profileHero, { backgroundColor: theme.surfaceContainer, borderColor: 'transparent' }]}>
+        <Avatar value={avatar} name={userName} size={62} theme={theme} />
         <View style={{ flex: 1 }}><Text style={[styles.profileName, { color: theme.text }]}>{userName}</Text><Text style={[styles.profileDetails, { color: theme.textMuted }]}>Your personal study space</Text></View>
       </View>
+
+      <SectionHeader title="Your picture" theme={theme} />
+      <View style={[styles.profileForm, { backgroundColor: theme.surfaceContainer }]}>
+        <Text style={[styles.profileFieldLabel, { color: theme.textMuted }]}>Pick one, or use a photo from your phone.</Text>
+        <AvatarPicker value={avatar} theme={theme} onSelect={(preset) => { onChangeAvatar(preset); setSaved(false); }} />
+        <View style={styles.avatarActions}>
+          <Pressable
+            onPress={() => void choosePhoto()}
+            android_ripple={{ color: `${theme.brand}18` }}
+            style={[styles.secondaryButton, { borderColor: theme.brand, backgroundColor: theme.brandContainer, flex: 1 }]}
+          >
+            <Ionicons name="image-outline" color={theme.onBrandContainer} size={18} />
+            <Text style={[styles.secondaryButtonText, { color: theme.onBrandContainer }]}>Use a photo</Text>
+          </Pressable>
+          {avatar ? (
+            <Pressable
+              onPress={() => { onChangeAvatar(undefined); setSaved(false); }}
+              android_ripple={{ color: `${theme.danger}18` }}
+              style={[styles.secondaryButton, { borderColor: theme.line, backgroundColor: theme.surfaceHigh, flex: 1 }]}
+            >
+              <Ionicons name="close" color={theme.textMuted} size={18} />
+              <Text style={[styles.secondaryButtonText, { color: theme.textMuted }]}>Remove</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       <SectionHeader title="Personal details" theme={theme} />
       <View style={[styles.profileForm, { backgroundColor: theme.surfaceContainer }]}>
         <Text style={[styles.profileFieldLabel, { color: theme.textMuted }]}>Full name</Text>
@@ -1501,13 +1576,13 @@ function ActionSheet({
   onSolver: () => void;
   onQuiz: () => void;
 }) {
-  const actions = [
-    { icon: 'cloud-upload-outline' as const, label: 'Upload a file', copy: 'Summaries and document-aware answers', color: '#6F62E7', action: onUpload },
-    { icon: 'chatbubble-ellipses-outline' as const, label: 'Ask Mentra', copy: 'Get a simple explanation', color: theme.brand, action: onChat },
-    { icon: 'scan-outline' as const, label: 'Solve a question', copy: 'Scan a math or science problem', color: '#13A58A', action: onSolver },
-    { icon: 'help-circle-outline' as const, label: 'Generate a quiz', copy: 'Test what you have learned', color: '#E98157', action: onQuiz },
+  const actions: { icon: Icon3DName; label: string; copy: string; action: () => void }[] = [
+    { icon: 'upload', label: 'Upload a file', copy: 'Summaries and document-aware answers', action: onUpload },
+    { icon: 'tutor', label: 'Ask Mentra', copy: 'Get a simple explanation', action: onChat },
+    { icon: 'solver', label: 'Solve a question', copy: 'Scan a maths or science problem', action: onSolver },
+    { icon: 'quiz', label: 'Generate a quiz', copy: 'Test what you have learned', action: onQuiz },
   ];
-  return <BottomSheet visible={visible} theme={theme} onClose={onClose}><Text style={[styles.sheetTitle, styles.actionSheetTitle, { color: theme.text }]}>What would you like to do?</Text><View style={styles.actionList}>{actions.map((item) => <Pressable key={item.label} onPress={item.action} style={[styles.actionRow, { backgroundColor: theme.surfaceMuted }]}><View style={[styles.actionIcon, { backgroundColor: `${item.color}20` }]}><Ionicons name={item.icon} color={item.color} size={21} /></View><View style={{ flex: 1 }}><Text style={[styles.actionTitle, { color: theme.text }]}>{item.label}</Text><Text style={[styles.actionCopy, { color: theme.textMuted }]}>{item.copy}</Text></View><Ionicons name="chevron-forward" color={theme.textMuted} size={18} /></Pressable>)}</View></BottomSheet>;
+  return <BottomSheet visible={visible} theme={theme} onClose={onClose}><Text style={[styles.sheetTitle, styles.actionSheetTitle, { color: theme.text }]}>What would you like to do?</Text><View style={styles.actionList}>{actions.map((item) => <Pressable key={item.label} onPress={item.action} style={[styles.actionRow, { backgroundColor: theme.surfaceMuted }]}><Icon3D name={item.icon} size={44} theme={theme} /><View style={{ flex: 1 }}><Text style={[styles.actionTitle, { color: theme.text }]}>{item.label}</Text><Text style={[styles.actionCopy, { color: theme.textMuted }]}>{item.copy}</Text></View><Ionicons name="chevron-forward" color={theme.textMuted} size={18} /></Pressable>)}</View></BottomSheet>;
 }
 
 function UploadSheet({ visible, theme, subjects, onClose, onUploaded }: { visible: boolean; theme: AppTheme; subjects: string[]; onClose: () => void; onUploaded: (file: PickedFile, subject: string, subjectDescription?: string) => Promise<void> }) {
@@ -1797,13 +1872,20 @@ function SolverSheet({ visible, theme, learningLevel, onSolved, onClose }: { vis
   return <BottomSheet visible={visible} theme={theme} onClose={onClose} tall><ScrollView style={styles.solverScroll} contentContainerStyle={styles.solverContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}><Text style={[styles.sheetTitle, { color: theme.text }]}>Solve a question</Text><Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Type a maths or science problem, or photograph it. Mentra will read it and show the complete working.</Text><View style={[styles.solveInput, { borderColor: theme.line, backgroundColor: theme.surfaceMuted }]}><TextInput value={question} onChangeText={(value) => { setQuestion(value); setSolution(null); }} placeholder="Type the full question here…" placeholderTextColor={theme.textMuted} multiline style={[styles.solveText, { color: theme.text }]} /><Pressable onPress={addPhoto} style={[styles.photoButton, { backgroundColor: theme.surface, borderColor: theme.line }]}><Ionicons name="camera-outline" color={theme.brand} size={20} /></Pressable></View>{image ? <View style={[styles.solverImageCard, { backgroundColor: theme.surfaceMuted, borderColor: theme.line }]}><Image source={{ uri: image.uri }} style={styles.solverImage} /><View style={{ flex: 1 }}><Text numberOfLines={1} style={[styles.solverImageName, { color: theme.text }]}>{image.name}</Text><Text style={[styles.solverImageMeta, { color: theme.textMuted }]}>Mentra will read this image with OCR.</Text></View><Pressable hitSlop={8} onPress={() => { setImage(null); setSolution(null); }}><Ionicons name="close-circle" color={theme.textMuted} size={21} /></Pressable></View> : null}{error ? <View style={[styles.aiError, { backgroundColor: theme.mode === 'dark' ? '#3A2024' : '#FFF0F0' }]}><Ionicons name="information-circle-outline" size={17} color={theme.danger} /><Text style={[styles.aiErrorText, { color: theme.danger }]}>{error}</Text></View> : null}<Pressable disabled={busy || (!question.trim() && !image)} onPress={solve} style={[styles.primaryButton, { backgroundColor: question.trim() || image ? theme.brand : theme.line }]}>{busy ? <><ActivityIndicator color="#FFF" /><Text style={styles.primaryButtonText}>Working through it…</Text></> : <><Text style={styles.primaryButtonText}>Solve step by step</Text><Ionicons name="arrow-forward" color="#FFF" size={18} /></>}</Pressable>{solution ? <View style={[styles.solution, { backgroundColor: theme.surfaceMuted, borderColor: theme.line }]}><View style={styles.solutionHeader}><View style={[styles.solutionIcon, { backgroundColor: theme.brandSoft }]}><Ionicons name="sparkles-outline" color={theme.brand} size={20} /></View><View style={{ flex: 1 }}><Text style={[styles.solutionLabel, { color: theme.brand }]}>MENTRA SOLUTION</Text><Text style={[styles.solutionHeading, { color: theme.text }]}>Complete working</Text></View></View><RichMessageText value={solution.answer} theme={theme} /><View style={[styles.solutionDivider, { backgroundColor: theme.line }]} />{solution.steps.map((step, index) => <View key={`${step}-${index}`} style={styles.solutionStep}><View style={[styles.solutionStepNumber, { backgroundColor: theme.brand }]}><Text style={styles.solutionStepNumberText}>{index + 1}</Text></View><View style={styles.solutionStepCopy}><RichMessageText value={step} theme={theme} /></View></View>)}<View style={[styles.finalAnswerCard, { backgroundColor: theme.brandSoft, borderColor: theme.brand }]}><Text style={[styles.finalAnswerLabel, { color: theme.brand }]}>FINAL ANSWER</Text><Text style={[styles.solutionAnswer, { color: theme.text }]}>{solution.finalAnswer}</Text></View>{solution.check ? <View style={[styles.solutionCheck, { borderColor: theme.line }]}><Ionicons name="checkmark-circle-outline" color={theme.success} size={20} /><View style={{ flex: 1 }}><Text style={[styles.solutionCheckTitle, { color: theme.text }]}>Quick check</Text><Text style={[styles.solutionCheckText, { color: theme.textMuted }]}>{solution.check}</Text></View></View> : null}{solution.tips?.length ? <View style={styles.solutionTips}><Text style={[styles.solutionTipsTitle, { color: theme.text }]}>Remember</Text>{solution.tips.map((tip) => <View key={tip} style={styles.solutionTipRow}><Ionicons name="bulb-outline" color={theme.warning} size={17} /><Text style={[styles.solutionTipText, { color: theme.textMuted }]}>{tip}</Text></View>)}</View> : null}<Pressable onPress={openVideoHelp} style={[styles.videoHelpButton, { backgroundColor: theme.surfaceContainer, borderColor: 'transparent' }]}><View style={styles.youtubeIcon}><Ionicons name="logo-youtube" color="#FFF" size={18} /></View><View style={{ flex: 1 }}><Text style={[styles.videoHelpTitle, { color: theme.text }]}>Watch a helpful lesson</Text><Text style={[styles.videoHelpBody, { color: theme.textMuted }]}>Open YouTube results for this exact topic.</Text></View><Ionicons name="open-outline" color={theme.brand} size={18} /></Pressable></View> : null}</ScrollView></BottomSheet>;
 }
 
-function ReaderSheet({ visible, material, theme, onClose, onOpenStudyTools }: { visible: boolean; material: StudyMaterial; theme: AppTheme; onClose: () => void; onOpenStudyTools: () => void }) {
+function ReaderSheet({ visible, material, theme, onClose, onOpenStudyTools, onProgress }: { visible: boolean; material: StudyMaterial; theme: AppTheme; onClose: () => void; onOpenStudyTools: () => void; onProgress: (materialId: string, page: number, pages: number) => void }) {
   const [readerError, setReaderError] = useState<string | null>(null);
   const [pages, setPages] = useState<number | null>(null);
+  const [page, setPage] = useState(material.readPage ?? 1);
 
   useEffect(() => {
-    if (visible) { setReaderError(null); setPages(null); }
+    // Only on open, never on progress: reacting to readPage would fight the
+    // viewer for control of the current page while the student scrolls.
+    if (visible) { setReaderError(null); setPages(null); setPage(material.readPage ?? 1); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, material.id]);
+
+  const total = pages ?? material.readPages ?? 0;
+  const percent = total ? Math.round((page / total) * 100) : 0;
 
   return (
     <BottomSheet visible={visible} theme={theme} onClose={onClose} tall>
@@ -1812,8 +1894,22 @@ function ReaderSheet({ visible, material, theme, onClose, onOpenStudyTools }: { 
           <View style={[styles.fileIconLarge, { backgroundColor: `${material.color}1C` }]}><Ionicons name="document-text" color={material.color} size={23} /></View>
           <View style={{ flex: 1 }}><Text numberOfLines={2} style={[styles.sheetTitle, { color: theme.text }]}>{material.title}</Text><Text style={[styles.actionCopy, { color: theme.textMuted }]}>{material.subject} · {pages ? `${pages} pages` : material.kind} · {material.size}</Text></View>
         </View>
+        {total ? <View style={styles.readerProgress}>
+          <View style={styles.readerProgressBar}><ProgressBar value={percent} theme={theme} /></View>
+          <Text style={[styles.readerProgressText, { color: theme.textMuted }]}>{page} of {total} · {percent}%</Text>
+        </View> : null}
         {material.uri ? <View style={[styles.pdfFrame, { borderColor: theme.line, backgroundColor: theme.surfaceMuted }]}>
-          <Pdf source={{ uri: material.uri, cache: false }} style={styles.pdfViewer} enablePaging spacing={8} trustAllCerts={false} onLoadComplete={(count) => setPages(count)} onError={() => setReaderError('Mentra could not load this PDF. Please upload the file again.')} />
+          <Pdf
+            source={{ uri: material.uri, cache: false }}
+            style={styles.pdfViewer}
+            enablePaging
+            spacing={8}
+            page={material.readPage && material.readPage > 1 ? material.readPage : 1}
+            trustAllCerts={false}
+            onLoadComplete={(count) => { setPages(count); onProgress(material.id, material.readPage ?? 1, count); }}
+            onPageChanged={(current, count) => { setPage(current); setPages(count); onProgress(material.id, current, count); }}
+            onError={() => setReaderError('Mentra could not load this PDF. Please upload the file again.')}
+          />
           {readerError ? <View style={[styles.pdfError, { backgroundColor: theme.surface }]}><Ionicons name="alert-circle-outline" color={theme.danger} size={20} /><Text style={[styles.pdfErrorText, { color: theme.text }]}>{readerError}</Text></View> : null}
         </View> : <View style={[styles.readerInfo, { backgroundColor: theme.surfaceMuted }]}><Ionicons name="alert-circle-outline" color={theme.warning} size={25} /><Text style={[styles.readerCopy, { color: theme.textMuted, flex: 1 }]}>This older library item has no file attached on this device. Upload it again to read it in Mentra.</Text></View>}
         <Pressable onPress={onOpenStudyTools} style={[styles.secondaryButton, { borderColor: theme.brand, backgroundColor: theme.brandSoft, marginTop: 11 }]}><Ionicons name="book-outline" color={theme.brand} size={18} /><Text style={[styles.secondaryButtonText, { color: theme.brand }]}>Study with Mentra AI</Text></Pressable>
@@ -1936,17 +2032,15 @@ function BottomSheet({ visible, theme, onClose, children, tall = false }: { visi
 }
 
 function FeatureLine({ icon, text, theme }: { icon: keyof typeof Ionicons.glyphMap; text: string; theme: AppTheme }) { return <View style={styles.featureLine}><View style={[styles.featureIcon, { backgroundColor: theme.brandSoft }]}><Ionicons name={icon} color={theme.brand} size={16} /></View><Text style={[styles.featureText, { color: theme.textMuted }]}>{text}</Text></View>; }
-function QuickAction({ icon, label, color, container, theme, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; color: string; container: string; theme: AppTheme; onPress: () => void }) {
+function QuickAction({ icon, label, theme, onPress }: { icon: Icon3DName; label: string; theme: AppTheme; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      android_ripple={{ color: `${color}22` }}
+      android_ripple={{ color: `${theme.brand}18` }}
       style={({ pressed }) => [styles.quickAction, { backgroundColor: theme.surfaceContainer, opacity: pressed ? 0.85 : 1 }]}
     >
-      <View style={[styles.quickIcon, { backgroundColor: container }]}>
-        <Ionicons name={icon} color={color} size={21} />
-      </View>
+      <Icon3D name={icon} size={46} theme={theme} />
       <Text numberOfLines={2} style={[styles.quickLabel, { color: theme.text }]}>{label}</Text>
     </Pressable>
   );
@@ -2022,7 +2116,7 @@ const styles = StyleSheet.create({
   quizCountTitle: { fontSize: 14, fontWeight: '700' },
   quizCountBody: { fontSize: 12, fontWeight: '600', marginTop: 3 },
   readerSheet: { flex: 1, marginHorizontal: 16 },
-  pdfFrame: { flex: 1, minHeight: 260, overflow: 'hidden', borderRadius: 18, borderWidth: 1 },
+  readerProgress: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }, readerProgressBar: { flex: 1 }, readerProgressText: { fontSize: 12, fontWeight: '600' }, pdfFrame: { flex: 1, minHeight: 260, overflow: 'hidden', borderRadius: 18, borderWidth: 1 },
   pdfViewer: { flex: 1, width: '100%', backgroundColor: 'transparent' },
   pdfError: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 9, padding: 22 },
   pdfErrorText: { textAlign: 'center', fontSize: 14, lineHeight: 20, fontWeight: '700' },
@@ -2036,7 +2130,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, screenTitle: { fontSize: 28, lineHeight: 41, fontWeight: '700', letterSpacing: -0.7 }, screenSubtitle: { fontSize: 15, lineHeight: 22, fontWeight: '600', marginTop: 5 }, uploadCard: { borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 23, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, uploadIcon: { width: 45, height: 45, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, uploadCopy: { flex: 1 }, uploadTitle: { fontSize: 15, fontWeight: '700' }, uploadBody: { fontSize: 13, fontWeight: '600', marginTop: 4 }, filterRow: { gap: 8 }, filter: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 }, filterText: { fontSize: 14, fontWeight: '600' }, libraryLabel: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -5 }, libraryCount: { fontSize: 15, fontWeight: '700' }, sortText: { fontSize: 13, fontWeight: '700' }, deleteConfirmCard: { borderWidth: 1, borderRadius: 20, padding: 14, gap: 14 }, deleteConfirmCopy: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, deleteConfirmTitle: { fontSize: 15, fontWeight: '700' }, deleteConfirmBody: { fontSize: 13, lineHeight: 19, fontWeight: '600', marginTop: 3 }, deleteConfirmActions: { flexDirection: 'row', gap: 9 }, deleteCancelButton: { flex: 1, minHeight: 43, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, deleteCancelText: { fontSize: 14, fontWeight: '700' }, deleteConfirmButton: { flex: 1, minHeight: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, deleteConfirmButtonText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
   practiceOptions: { gap: 11 }, practiceOption: { minHeight: 77, borderRadius: 22, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12 }, practiceOptionCopy: { flex: 1 }, practiceOptionTitle: { color: '#FFF', fontSize: 16, fontWeight: '700' }, practiceOptionBody: { color: 'rgba(255,255,255,0.78)', fontSize: 13, marginTop: 3, fontWeight: '600' }, flashcard: { minHeight: 255, borderRadius: 26, borderWidth: 1, overflow: 'hidden' }, 
   calendarCard: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md }, calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, calendarMonth: { ...type.subtitle }, calendarNav: { flexDirection: 'row', gap: 4 }, calendarWeekRow: { flexDirection: 'row' }, calendarWeekday: { ...type.label, flex: 1, textAlign: 'center' }, calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 4 }, calendarCell: { width: '14.2857%', alignItems: 'center', paddingVertical: 2, gap: 3 }, calendarCellInner: { height: 38, width: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, calendarCellText: { ...type.caption, fontSize: 15 }, calendarDotRow: { flexDirection: 'row', gap: 3, height: 5 }, calendarDot: { width: 5, height: 5, borderRadius: 2.5 }, scheduleList: { gap: 9 }, plannerRow: { minHeight: 74, borderRadius: radius.md, paddingRight: 6, flexDirection: 'row', alignItems: 'center', gap: 12, overflow: 'hidden' }, planStripe: { width: 4, alignSelf: 'stretch', borderTopLeftRadius: radius.md, borderBottomLeftRadius: radius.md }, planTime: { width: 62, alignItems: 'flex-start', justifyContent: 'center', gap: 2, paddingLeft: 10 }, planDate: { ...type.label, letterSpacing: 0.2 }, planClock: { ...type.bodyStrong, fontSize: 15 }, planTitle: { ...type.bodyStrong }, planMeta: { ...type.caption, fontWeight: '400', marginTop: 3 }, nextUpCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.lg, padding: spacing.lg }, nextUpIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }, nextUpLabel: { ...type.label, opacity: 0.75 }, nextUpTitle: { ...type.subtitle, marginTop: 4 }, nextUpMeta: { ...type.caption, opacity: 0.8, marginTop: 2 }, planDelete: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, plannerEditorContent: { paddingHorizontal: 12, paddingBottom: 28, gap: 12 }, plannerFieldLabel: { fontSize: 14, fontWeight: '700', marginTop: 5 }, plannerInput: { minHeight: 50, borderRadius: 14, borderWidth: 1, paddingHorizontal: 13, fontSize: 15, fontWeight: '600' }, plannerChoiceWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, plannerChoice: { minHeight: 39, borderRadius: 999, borderWidth: 1, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center' }, plannerChoiceText: { fontSize: 13, fontWeight: '600' }, plannerDateTimeRow: { flexDirection: 'row', gap: 9 }, plannerDateTimeButton: { flex: 1, minHeight: 65, borderRadius: 15, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 9 }, plannerDateTimeCaption: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 }, plannerDateTimeValue: { fontSize: 13, fontWeight: '600', marginTop: 3 }, plannerPickerWrap: { borderRadius: 15, borderWidth: 1, overflow: 'hidden', alignItems: 'center' }, plannerNotice: { borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 }, plannerNoticeText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: '700' }, plannerDeleteButton: { minHeight: 48, borderWidth: 1, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, plannerDeleteText: { fontSize: 14, fontWeight: '700' },
-  profileHero: { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1 }, avatar: { height: 54, width: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#FFF', fontSize: 23, fontWeight: '700' }, profileName: { fontSize: 19, fontWeight: '700', marginBottom: 3 }, profileDetails: { fontSize: 13, fontWeight: '500', marginBottom: 6 }, insightGrid: { flexDirection: 'row', gap: 9 }, statBox: { flex: 1, minHeight: 103, borderRadius: 14, padding: 12, justifyContent: 'center', gap: 5, borderWidth: 1 }, statValue: { fontSize: 19, fontWeight: '700' }, statLabel: { fontSize: 12, fontWeight: '600' }, settingsCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1 }, settingRow: { minHeight: 68, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }, settingIcon: { height: 38, width: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, settingTitle: { fontSize: 15, fontWeight: '700' }, settingSubtitle: { fontSize: 12, marginTop: 3, fontWeight: '500' }, signOut: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E7EAF1', minHeight: 59, paddingHorizontal: 17, alignItems: 'center', flexDirection: 'row', gap: 11 }, signOutText: { fontSize: 15, fontWeight: '700' },
+  avatarActions: { flexDirection: 'row', gap: 10, marginTop: 12 }, profileHero: { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1 }, avatar: { height: 54, width: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#FFF', fontSize: 23, fontWeight: '700' }, profileName: { fontSize: 19, fontWeight: '700', marginBottom: 3 }, profileDetails: { fontSize: 13, fontWeight: '500', marginBottom: 6 }, insightGrid: { flexDirection: 'row', gap: 9 }, statBox: { flex: 1, minHeight: 103, borderRadius: 14, padding: 12, justifyContent: 'center', gap: 5, borderWidth: 1 }, statValue: { fontSize: 19, fontWeight: '700' }, statLabel: { fontSize: 12, fontWeight: '600' }, settingsCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1 }, settingRow: { minHeight: 68, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }, settingIcon: { height: 38, width: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, settingTitle: { fontSize: 15, fontWeight: '700' }, settingSubtitle: { fontSize: 12, marginTop: 3, fontWeight: '500' }, signOut: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E7EAF1', minHeight: 59, paddingHorizontal: 17, alignItems: 'center', flexDirection: 'row', gap: 11 }, signOutText: { fontSize: 15, fontWeight: '700' },
   fab: { position: 'absolute', right: 20, width: 58, height: 58, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.18, shadowOffset: { width: 0, height: 5 }, shadowRadius: 10, elevation: 5 }, keyboardAvoider: { flex: 1 }, modalWrap: { flex: 1, justifyContent: 'flex-end' }, backdrop: { ...StyleSheet.absoluteFillObject }, sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: spacing.xl, paddingBottom: spacing.md, paddingTop: spacing.md }, sheetContent: { marginHorizontal: 8 }, tallSheetContent: { flex: 1, marginHorizontal: 0 }, handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: spacing.lg }, closeSheet: { position: 'absolute', right: spacing.lg, top: spacing.md, height: 38, width: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, sheetTitle: { ...type.title, paddingRight: 44 }, actionSheetTitle: { marginHorizontal: 0 }, sheetSubtitle: { ...type.body, marginTop: spacing.sm }, actionList: { gap: 9, marginTop: 18, marginHorizontal: 0 }, actionRow: { minHeight: 67, borderRadius: 14, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11 }, actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }, actionTitle: { fontSize: 15, fontWeight: '700' }, actionCopy: { fontSize: 12, fontWeight: '500', marginTop: 3 }, dropZone: { minHeight: 168, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginTop: 19 }, dropIcon: { height: 52, width: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 9 }, dropTitle: { fontSize: 15, fontWeight: '700' }, dropBody: { fontSize: 13, fontWeight: '500', marginTop: 4 }, supportedRow: { flexDirection: 'row', justifyContent: 'center', gap: 7, marginTop: 13 }, uploadSubjectLabel: { fontSize: 14, fontWeight: '700', marginTop: 19 }, uploadSubjectRow: { gap: 8, paddingTop: 9, paddingBottom: 2 }, uploadSubjectChip: { minHeight: 37, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 5 }, uploadSubjectText: { fontSize: 13, fontWeight: '700' }, uploadSuccessGroup: { gap: 12 }, uploadComplete: { minHeight: 78, borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 18 }, secondaryButton: { minHeight: 47, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, secondaryButtonText: { fontSize: 15, fontWeight: '700' },
   quizContent: { flex: 1, marginHorizontal: 16 }, quizScroll: { flex: 1, minHeight: 0 }, quizSubjectList: { gap: 9, marginTop: 18 }, quizSubjectOption: { minHeight: 52, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, chatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginHorizontal: 16, marginTop: 4, paddingRight: 39 }, onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }, onlineDot: { height: 6, width: 6, borderRadius: 3 }, onlineText: { fontSize: 12, fontWeight: '700' }, chatScroll: { flex: 1, minHeight: 0, marginTop: 15, marginHorizontal: 16 }, chatMessages: { flexGrow: 1, gap: 11, paddingBottom: 10 }, message: { maxWidth: '90%', borderRadius: 18, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1 }, userMessage: { alignSelf: 'flex-end', borderBottomRightRadius: 5 }, aiMessage: { alignSelf: 'flex-start', borderBottomLeftRadius: 5 }, richMessage: { gap: 5 }, messageText: { fontSize: 14, lineHeight: 20, fontWeight: '500' }, messageBold: { fontWeight: '700' }, messageHeading: { fontSize: 15, lineHeight: 22, fontWeight: '700', marginTop: 2 }, messageSpacer: { height: 3 }, messageListRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, messageBullet: { width: 5, height: 5, borderRadius: 3, marginTop: 7 }, messageNumber: { width: 18, fontSize: 14, lineHeight: 20, fontWeight: '700' }, messageListText: { flex: 1 }, messageItalic: { fontStyle: 'italic' }, messageCode: { fontFamily: 'monospace', fontSize: 14 }, messageSubheading: { fontSize: 15, lineHeight: 22, fontWeight: '700', marginTop: 6 }, messageRule: { height: StyleSheet.hairlineWidth, marginVertical: 8 }, messageTable: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm, overflow: 'hidden', marginVertical: 6 }, messageTableRow: { flexDirection: 'row' }, messageTableCell: { flex: 1, paddingHorizontal: 10, paddingVertical: 8 }, messageTableHead: { fontSize: 13, fontWeight: '700' }, messageTableText: { fontSize: 13 }, summaryContent: { paddingBottom: 8 }, summaryBody: { marginTop: 14, marginBottom: 16 }, citationList: { marginTop: 10, borderTopWidth: 1, paddingTop: 8, gap: 6 }, citation: { maxWidth: '100%', borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5 }, citationText: { flexShrink: 1, fontSize: 11, fontWeight: '600' }, typing: { alignSelf: 'flex-start', borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 7 }, typingText: { fontSize: 13, fontWeight: '700' }, aiError: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 14 }, aiErrorText: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 22 }, chatComposer: { paddingTop: 7, paddingBottom: 2 }, attachmentRow: { gap: 8, paddingHorizontal: 16, paddingBottom: 8 }, attachmentChip: { maxWidth: 240, minHeight: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, attachmentCopy: { flexShrink: 1, minWidth: 100 }, attachmentName: { fontSize: 12, fontWeight: '600' }, attachmentStatus: { fontSize: 11, fontWeight: '600', marginTop: 2 }, chatInput: { minHeight: 52, borderRadius: 18, borderWidth: 1, flexDirection: 'row', alignItems: 'center', padding: 5, marginHorizontal: 16 }, attachButton: { height: 40, width: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, chatTextInput: { flex: 1, maxHeight: 88, fontSize: 15, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 8 }, sendButton: { height: 40, width: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   solveInput: { minHeight: 105, borderRadius: 20, borderWidth: 1, marginTop: 17, padding: 12, flexDirection: 'row', alignItems: 'flex-start' }, solveText: { flex: 1, fontSize: 15, lineHeight: 22, fontWeight: '600', minHeight: 72 }, photoButton: { height: 38, width: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, solution: { marginTop: 14, borderRadius: 19, padding: 15, gap: 10 }, solutionLabel: { fontSize: 12, letterSpacing: 0.8, fontWeight: '700' }, solutionAnswer: { fontSize: 15, fontWeight: '700', marginTop: 3 }, materialHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 19 }, fileIconLarge: { width: 47, height: 47, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }, readerInfo: { borderRadius: 19, padding: 15, flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, readerCopy: { fontSize: 14, lineHeight: 20, fontWeight: '600', marginTop: 4 }, privacyContent: { gap: 10, paddingTop: 17, paddingBottom: 18 }, privacySection: { borderRadius: 17, padding: 14, gap: 6 }, privacyTitle: { fontSize: 15, fontWeight: '700' }, privacyBody: { fontSize: 14, lineHeight: 20, fontWeight: '600' }, privacyReview: { borderRadius: 17, padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }, privacyReviewText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: '700' }, summaryEmpty: { alignItems: 'center', paddingVertical: 24 }, summaryArt: { height: 75, width: 75, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 17 }, summaryEmptyTitle: { fontSize: 19, fontWeight: '700' }, summaryEmptyText: { marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '600', maxWidth: 300 }, summaryLead: { marginTop: 13, marginBottom: 15, fontSize: 15, lineHeight: 22, fontWeight: '600' }, examNotes: { borderRadius: 17, padding: 13, flexDirection: 'row', gap: 10, marginBottom: 15 }, notesTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 }, notesText: { fontSize: 13, lineHeight: 19, fontWeight: '600' }, keyPointsTitle: { fontSize: 16, fontWeight: '700', marginBottom: 9 }, keyPoint: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }, keyPointText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '600' },

@@ -340,3 +340,19 @@ export async function pickQuestionImage(): Promise<PickedFile | null> {
   if (!asset) return null;
   return { name: asset.fileName ?? 'study-question.jpg', uri: asset.uri, mimeType: asset.mimeType, size: asset.fileSize };
 }
+
+/** Square-cropped photo for the profile avatar. */
+export async function pickAvatarPhoto(): Promise<PickedFile | null> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) throw new Error('Allow photo access so Mentra can set your picture.');
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+  });
+  if (result.canceled) return null;
+  const asset = result.assets[0];
+  if (!asset) return null;
+  return { name: asset.fileName ?? 'avatar.jpg', uri: asset.uri, mimeType: asset.mimeType, size: asset.fileSize };
+}

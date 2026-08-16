@@ -53,9 +53,16 @@ export const auth = {
     if (error) throw error;
   },
 
-  async updateProfile({ fullName, school, country, subjects, subjectDescriptions }: { fullName: string; school: string; country: string; subjects?: string[]; subjectDescriptions?: Record<string, string> }) {
+  async updateProfile({ fullName, school, country, subjects, subjectDescriptions, avatar }: { fullName: string; school: string; country: string; subjects?: string[]; subjectDescriptions?: Record<string, string>; avatar?: string }) {
     const { data, error } = await requireClient().auth.updateUser({
-      data: { full_name: fullName, school, country, ...(subjects ? { subjects } : {}), ...(subjectDescriptions ? { subject_descriptions: subjectDescriptions } : {}) },
+      data: {
+        full_name: fullName,
+        school,
+        country,
+        ...(subjects ? { subjects } : {}),
+        ...(subjectDescriptions ? { subject_descriptions: subjectDescriptions } : {}),
+        ...(avatar !== undefined ? { avatar } : {}),
+      },
     });
     if (error) throw error;
     return data;

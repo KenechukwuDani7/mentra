@@ -40,6 +40,10 @@ export function MaterialRow({
   onDelete?: () => void;
 }) {
   const palette = kindPalette(material.kind, theme);
+  // Null rather than 0 so an unopened file shows its date instead of "0%".
+  const percent = material.readPages && material.readPage
+    ? Math.min(100, Math.round((material.readPage / material.readPages) * 100))
+    : null;
   return (
     <View style={[styles.row, { backgroundColor: theme.surfaceContainer }]}>
       <Pressable
@@ -55,8 +59,18 @@ export function MaterialRow({
             {material.title}
           </Text>
           <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted }]}>
-            {material.subject} · {material.size} · {material.createdAt}
+            {material.subject} · {material.size}{percent === null ? ` · ${material.createdAt}` : ''}
           </Text>
+          {percent !== null ? (
+            <View style={styles.progressRow}>
+              <View style={[styles.progressTrack, { backgroundColor: theme.surfaceHighest }]}>
+                <View style={[styles.progressFill, { width: `${percent}%`, backgroundColor: percent >= 100 ? theme.success : palette.fg }]} />
+              </View>
+              <Text style={[styles.progressLabel, { color: percent >= 100 ? theme.success : theme.textMuted }]}>
+                {percent >= 100 ? 'Read' : `${percent}%`}
+              </Text>
+            </View>
+          ) : null}
         </View>
         {!onDelete ? <Ionicons name="chevron-forward" color={theme.textSubtle} size={18} /> : null}
       </Pressable>
@@ -92,7 +106,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   fileIcon: { width: 46, height: 46, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
-  copy: { flex: 1, gap: 3 },
+  copy: { flex: 1, gap: 4 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  progressTrack: { flex: 1, height: 5, borderRadius: radius.pill, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radius.pill },
+  progressLabel: { ...type.label, letterSpacing: 0.2 },
   title: { ...type.bodyStrong },
   meta: { ...type.caption, fontWeight: '400' },
   deleteButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

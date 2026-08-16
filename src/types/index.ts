@@ -14,6 +14,9 @@ export type StudyMaterial = {
   uri?: string;
   mimeType?: string;
   subjectDescription?: string;
+  /** Furthest page reached, and the document's length, for the progress bar. */
+  readPage?: number;
+  readPages?: number;
 };
 
 export type Flashcard = {
