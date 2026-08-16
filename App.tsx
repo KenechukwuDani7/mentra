@@ -85,7 +85,9 @@ function MentraApp() {
   const insets = useSafeAreaInsets();
   const systemTheme = useColorScheme();
   const [stage, setStage] = useState<AppStage>('loading');
-  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  // Light is the default look. Students can switch to dark, or hand control
+  // back to the device, from Settings — a saved choice always wins over this.
+  const [themePreference, setThemePreference] = useState<ThemePreference>('light');
   const [themePreferenceReady, setThemePreferenceReady] = useState(false);
   const [activeTab, setActiveTab] = useState<RootTab>('Home');
   const [profileOpen, setProfileOpen] = useState(false);

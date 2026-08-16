@@ -15,11 +15,14 @@ const tabs: { label: RootTab; icon: keyof typeof Ionicons.glyphMap; activeIcon: 
   { label: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
 ];
 
-const DOCK_HEIGHT = 60;
+const DOCK_HEIGHT = 58;
 const DOCK_PADDING = 5;
 const HOST_PADDING = 14;
-// Matches the app shell's maxWidth so the dock stays centred on tablets.
-const MAX_DOCK_WIDTH = 600;
+// The dock hugs its icons rather than stretching edge to edge. Spanning the
+// full width pushed the tabs far apart and read as a long bar instead of a
+// floating control.
+const SLOT_WIDTH = 54;
+const MAX_DOCK_WIDTH = SLOT_WIDTH * tabs.length + DOCK_PADDING * 2;
 
 /** Height the dock occupies, so scroll views can pad their content past it. */
 export const BOTTOM_NAV_CLEARANCE = DOCK_HEIGHT + 22;
@@ -43,10 +46,15 @@ export function BottomNav({
   // Derived rather than measured: BlurView swallows onLayout, and deriving the
   // track means the indicator is positioned correctly on the very first frame
   // instead of popping in after a layout pass.
-  const dockWidth = Math.min(screenWidth, MAX_DOCK_WIDTH) - HOST_PADDING * 2;
+  //
+  // The dock takes its natural width and only shrinks on a screen too narrow
+  // to hold it, so the tabs stay a comfortable thumb's width apart instead of
+  // being spread across the display.
+  const available = screenWidth - HOST_PADDING * 2;
+  const dockWidth = Math.min(available, MAX_DOCK_WIDTH);
   const trackWidth = Math.max(0, dockWidth - DOCK_PADDING * 2);
   const slotWidth = trackWidth / tabs.length;
-  const pillWidth = Math.max(44, slotWidth - 8);
+  const pillWidth = Math.max(40, slotWidth - 6);
   const offsetFor = (index: number) => index * slotWidth + (slotWidth - pillWidth) / 2;
 
   // The value holds the pixel offset directly. Interpolating an index instead
@@ -152,7 +160,7 @@ const styles = StyleSheet.create({
   },
   dock: {
     width: '100%',
-    maxWidth: MAX_DOCK_WIDTH - HOST_PADDING * 2,
+    maxWidth: MAX_DOCK_WIDTH,
     height: DOCK_HEIGHT,
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
