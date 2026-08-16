@@ -88,22 +88,25 @@ export const themes: Record<ThemeMode, AppTheme> = {
     brandDark: '#12408F',
     brandSoft: '#EDF2FE',
 
-    background: '#FBFCFE',
+    // Surfaces carry a slight warmth so the app reads like paper on a desk
+    // rather than a analytics dashboard. The blue stays cool against it, which
+    // is what keeps the brand legible.
+    background: '#FBFAF7',
     surface: '#FFFFFF',
     surfaceLowest: '#FFFFFF',
-    surfaceLow: '#F6F8FC',
-    surfaceContainer: '#F1F4F9',
-    surfaceHigh: '#EAEEF6',
-    surfaceHighest: '#E3E8F2',
-    surfaceMuted: '#F1F4F9',
+    surfaceLow: '#F8F6F2',
+    surfaceContainer: '#F3F0EB',
+    surfaceHigh: '#ECE8E2',
+    surfaceHighest: '#E4DFD8',
+    surfaceMuted: '#F3F0EB',
 
-    text: '#12141A',
-    textMuted: '#5A6172',
-    textSubtle: '#858C9C',
+    text: '#1A1713',
+    textMuted: '#5E574E',
+    textSubtle: '#8B8378',
     onSurfaceInverse: '#FFFFFF',
 
-    line: '#DFE4ED',
-    lineSoft: '#EDF0F6',
+    line: '#E4DFD8',
+    lineSoft: '#F0ECE6',
 
     ...status,
     successContainer: '#DCF4E7',
@@ -119,14 +122,14 @@ export const themes: Record<ThemeMode, AppTheme> = {
     amber: '#B46A18',
     amberContainer: '#FCEBD8',
 
-    glass: 'rgba(255,255,255,0.62)',
-    glassBorder: 'rgba(18,24,40,0.10)',
+    glass: 'rgba(255,253,250,0.62)',
+    glassBorder: 'rgba(40,32,24,0.10)',
     glassHighlight: 'rgba(31,95,219,0.13)',
     blurTint: 'light',
 
-    shadow: '#0B1220',
+    shadow: '#1A1409',
     nav: '#FFFFFF',
-    scrim: 'rgba(12,16,26,0.42)',
+    scrim: 'rgba(22,18,12,0.42)',
   },
 
   dark: {
@@ -140,22 +143,24 @@ export const themes: Record<ThemeMode, AppTheme> = {
     brandDark: '#7FA6F5',
     brandSoft: '#16274A',
 
-    background: '#0B0D12',
-    surface: '#12151B',
-    surfaceLowest: '#080A0E',
-    surfaceLow: '#14171E',
-    surfaceContainer: '#181C23',
-    surfaceHigh: '#20242C',
-    surfaceHighest: '#282D36',
-    surfaceMuted: '#181C23',
+    // Dark keeps a trace of the same warmth so switching modes does not feel
+    // like moving between two different apps.
+    background: '#0F0E0C',
+    surface: '#171613',
+    surfaceLowest: '#0A0908',
+    surfaceLow: '#1A1815',
+    surfaceContainer: '#1F1D19',
+    surfaceHigh: '#282520',
+    surfaceHighest: '#312D28',
+    surfaceMuted: '#1F1D19',
 
-    text: '#EDEFF5',
-    textMuted: '#A5ACBC',
-    textSubtle: '#79808F',
-    onSurfaceInverse: '#12141A',
+    text: '#F2EFEA',
+    textMuted: '#ADA69C',
+    textSubtle: '#7E766C',
+    onSurfaceInverse: '#1A1713',
 
-    line: '#2B303A',
-    lineSoft: '#1E222A',
+    line: '#332F2A',
+    lineSoft: '#231F1B',
 
     ...status,
     success: '#5FD3A0',
@@ -174,13 +179,13 @@ export const themes: Record<ThemeMode, AppTheme> = {
     amber: '#F0B87A',
     amberContainer: '#3B2A14',
 
-    glass: 'rgba(20,24,32,0.58)',
-    glassBorder: 'rgba(255,255,255,0.12)',
+    glass: 'rgba(26,24,21,0.58)',
+    glassBorder: 'rgba(255,250,244,0.12)',
     glassHighlight: 'rgba(169,197,255,0.18)',
     blurTint: 'dark',
 
     shadow: '#000000',
-    nav: '#0B0D12',
+    nav: '#0F0E0C',
     scrim: 'rgba(0,0,0,0.58)',
   },
 };

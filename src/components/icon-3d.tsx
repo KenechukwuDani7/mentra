@@ -78,9 +78,11 @@ function glyph(name: Icon3DName) {
         </>
       );
     case 'tutor':
+      // Bubble plus a four-point spark — the shorthand people now read as AI.
       return (
         <>
-          <Path d="M20 24h24a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4H31l-7 5v-5h-4a4 4 0 0 1-4-4V28a4 4 0 0 1 4-4Z" />
+          <Path d="M19 22h26a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H31l-8 5.5V42h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4Z" />
+          <Path d="M40.5 14.5c.7 3.4 1.4 4.1 4.8 4.8-3.4.7-4.1 1.4-4.8 4.8-.7-3.4-1.4-4.1-4.8-4.8 3.4-.7 4.1-1.4 4.8-4.8Z" />
         </>
       );
     case 'solver':
@@ -181,8 +183,8 @@ function inlay(name: Icon3DName, color: string) {
     case 'tutor':
       return (
         <>
-          <Rect x="25" y="30" width="16" height="3" rx="1.5" fill={color} opacity={0.5} />
-          <Rect x="25" y="36" width="10" height="3" rx="1.5" fill={color} opacity={0.35} />
+          <Rect x="24" y="29" width="17" height="3" rx="1.5" fill={color} opacity={0.5} />
+          <Rect x="24" y="35" width="11" height="3" rx="1.5" fill={color} opacity={0.35} />
         </>
       );
     default:

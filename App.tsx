@@ -1898,7 +1898,7 @@ function ReaderSheet({ visible, material, theme, onClose, onOpenStudyTools, onPr
           <View style={styles.readerProgressBar}><ProgressBar value={percent} theme={theme} /></View>
           <Text style={[styles.readerProgressText, { color: theme.textMuted }]}>{page} of {total} · {percent}%</Text>
         </View> : null}
-        {material.uri ? <View style={[styles.pdfFrame, { borderColor: theme.line, backgroundColor: theme.surfaceMuted }]}>
+        {material.uri ? <View style={[styles.pdfFrame, { borderColor: theme.line, backgroundColor: theme.mode === 'dark' ? theme.surfaceLow : theme.surface }]}>
           <Pdf
             source={{ uri: material.uri, cache: false }}
             style={styles.pdfViewer}

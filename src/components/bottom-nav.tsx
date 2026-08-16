@@ -1,18 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NavIcon } from '@/components/nav-icons';
 import type { RootTab } from '@/types';
 import { motion, radius, type AppTheme } from '@/theme/tokens';
 
-const tabs: { label: RootTab; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }[] = [
-  { label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { label: 'Library', icon: 'library-outline', activeIcon: 'library' },
-  { label: 'Practice', icon: 'clipboard-outline', activeIcon: 'clipboard' },
-  { label: 'Planner', icon: 'calendar-outline', activeIcon: 'calendar' },
-  { label: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
+const tabs: { label: RootTab }[] = [
+  { label: 'Home' },
+  { label: 'Library' },
+  { label: 'Practice' },
+  { label: 'Planner' },
+  { label: 'Settings' },
 ];
 
 const DOCK_HEIGHT = 58;
@@ -21,7 +21,7 @@ const HOST_PADDING = 14;
 // The dock hugs its icons rather than stretching edge to edge. Spanning the
 // full width pushed the tabs far apart and read as a long bar instead of a
 // floating control.
-const SLOT_WIDTH = 54;
+const SLOT_WIDTH = 66;
 const MAX_DOCK_WIDTH = SLOT_WIDTH * tabs.length + DOCK_PADDING * 2;
 
 /** Height the dock occupies, so scroll views can pad their content past it. */
@@ -40,7 +40,9 @@ export function BottomNav({
   badges?: Partial<Record<RootTab, boolean>>;
 }) {
   const insets = useSafeAreaInsets();
-  const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
+  // useWindowDimensions subscribes for us and, unlike a Dimensions snapshot
+  // taken at mount, is never 0 on the first render.
+  const { width: screenWidth } = useWindowDimensions();
   const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.label === active));
 
   // Derived rather than measured: BlurView swallows onLayout, and deriving the
@@ -50,8 +52,11 @@ export function BottomNav({
   // The dock takes its natural width and only shrinks on a screen too narrow
   // to hold it, so the tabs stay a comfortable thumb's width apart instead of
   // being spread across the display.
+  // Fall back to the natural width if the platform has not reported a screen
+  // size yet. Letting it go negative silently collapsed the track to zero and
+  // took the active indicator with it.
   const available = screenWidth - HOST_PADDING * 2;
-  const dockWidth = Math.min(available, MAX_DOCK_WIDTH);
+  const dockWidth = available > 0 ? Math.min(available, MAX_DOCK_WIDTH) : MAX_DOCK_WIDTH;
   const trackWidth = Math.max(0, dockWidth - DOCK_PADDING * 2);
   const slotWidth = trackWidth / tabs.length;
   const pillWidth = Math.max(40, slotWidth - 6);
@@ -80,11 +85,6 @@ export function BottomNav({
     // offsetFor is derived from the values already listed here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, trackWidth, translateX]);
-
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => setScreenWidth(window.width));
-    return () => subscription.remove();
-  }, []);
 
   return (
     <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -131,11 +131,7 @@ export function BottomNav({
               >
                 {({ pressed }) => (
                   <View style={[styles.iconWrap, pressed ? styles.pressed : null]}>
-                    <Ionicons
-                      name={selected ? tab.activeIcon : tab.icon}
-                      size={23}
-                      color={selected ? theme.text : theme.textMuted}
-                    />
+                    <NavIcon tab={tab.label} active={selected} size={24} color={selected ? theme.brand : theme.textMuted} />
                     {badges?.[tab.label] ? <View style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.glass }]} /> : null}
                   </View>
                 )}
