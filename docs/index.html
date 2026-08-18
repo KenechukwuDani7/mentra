@@ -1,0 +1,446 @@
+<title>Mentra</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An AI study companion for African learners. Upload your own notes and get explanations, flashcards, quizzes and a study plan built from them.">
+
+<style>
+  /* Tokens. Light lives on the bare :root so the un-stamped system default
+     resolves correctly; dark redefines only the values. */
+  :root {
+    --paper: #FBFAF7;
+    --surface: #FFFFFF;
+    --sunken: #F3F0EB;
+    --ink: #1A1713;
+    --muted: #5E574E;
+    --faint: #8B8378;
+    --rule: #E4DFD8;
+    --brand: #1F5FDB;
+    --brand-wash: #DCE6FF;
+    --on-brand: #FFFFFF;
+    --margin-rule: rgba(190, 78, 78, 0.30);
+    --ruled-line: rgba(26, 23, 19, 0.045);
+    --shadow: rgba(26, 20, 9, 0.10);
+    --shadow-deep: rgba(26, 20, 9, 0.16);
+
+    --display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --utility: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+    --measure: 62ch;
+    --gutter: clamp(20px, 5vw, 64px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0F0E0C;
+      --surface: #171613;
+      --sunken: #1F1D19;
+      --ink: #F2EFEA;
+      --muted: #ADA69C;
+      --faint: #7E766C;
+      --rule: #332F2A;
+      --brand: #A9C5FF;
+      --brand-wash: #16274A;
+      --on-brand: #00295E;
+      --margin-rule: rgba(224, 120, 120, 0.28);
+      --ruled-line: rgba(242, 239, 234, 0.05);
+      --shadow: rgba(0, 0, 0, 0.5);
+      --shadow-deep: rgba(0, 0, 0, 0.66);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0F0E0C;
+    --surface: #171613;
+    --sunken: #1F1D19;
+    --ink: #F2EFEA;
+    --muted: #ADA69C;
+    --faint: #7E766C;
+    --rule: #332F2A;
+    --brand: #A9C5FF;
+    --brand-wash: #16274A;
+    --on-brand: #00295E;
+    --margin-rule: rgba(224, 120, 120, 0.28);
+    --ruled-line: rgba(242, 239, 234, 0.05);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --shadow-deep: rgba(0, 0, 0, 0.66);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1140px; margin: 0 auto; padding-inline: var(--gutter); }
+
+  h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.6rem, 6vw, 4.1rem); line-height: 1.04; letter-spacing: -0.025em; }
+  h2 { font-size: clamp(1.9rem, 3.6vw, 2.7rem); line-height: 1.12; letter-spacing: -0.02em; }
+  h3 { font-size: 1.22rem; line-height: 1.3; letter-spacing: -0.01em; }
+  p { margin: 0; }
+
+  .eyebrow {
+    font-family: var(--utility);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  a { color: inherit; }
+  a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+
+  .masthead {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; padding-block: 26px;
+  }
+  .wordmark { display: flex; align-items: center; gap: 11px; font-family: var(--display); font-size: 1.32rem; font-weight: 600; letter-spacing: -0.02em; }
+  .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--brand); display: grid; place-items: center; flex: none; }
+  .masthead nav { display: flex; gap: 26px; align-items: center; font-size: 0.94rem; color: var(--muted); }
+  .masthead nav a { text-decoration: none; }
+  .masthead nav a:hover { color: var(--ink); }
+  @media (max-width: 720px) { .masthead nav .hide-sm { display: none; } }
+
+  .hero { position: relative; padding-block: clamp(30px, 5vw, 66px) clamp(56px, 8vw, 104px); overflow: hidden; }
+  /* Ruled like an exercise book, hero only, so it reads as stock rather than
+     a motif hammered through every section. */
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, transparent 0 33px, var(--ruled-line) 33px 34px);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
+  }
+  .hero > * { position: relative; }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: clamp(32px, 6vw, 76px); align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .hero-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
+  .hero-copy h1 { max-width: 13ch; }
+  .hero-copy .lede { font-size: 1.16rem; color: var(--muted); max-width: 46ch; }
+  .hero-copy .meta { max-width: 46ch; }
+  h1 em { font-style: normal; color: var(--brand); }
+
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    font: inherit; font-weight: 600; font-size: 1rem;
+    padding: 14px 24px; border-radius: 999px; text-decoration: none;
+    border: 1.5px solid transparent; cursor: pointer;
+    transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  }
+  .btn-primary { background: var(--brand); color: var(--on-brand); box-shadow: 0 6px 18px var(--shadow); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px var(--shadow-deep); }
+  .btn-ghost { border-color: var(--rule); color: var(--ink); }
+  .btn-ghost:hover { background: var(--sunken); }
+
+  .meta { font-family: var(--utility); font-size: 0.78rem; color: var(--faint); letter-spacing: 0.02em; }
+
+  /* The phone shows the real Home screen, rebuilt from the app's own tokens. */
+  .phone {
+    width: 300px; justify-self: center;
+    border-radius: 38px; padding: 9px;
+    background: linear-gradient(160deg, #2C2A26, #131211);
+    box-shadow: 0 30px 60px var(--shadow-deep);
+  }
+  .screen {
+    border-radius: 30px; overflow: hidden; position: relative;
+    background: #FBFAF7; color: #1A1713;
+    height: 594px; display: flex; flex-direction: column;
+  }
+  .screen .status { display: flex; justify-content: space-between; padding: 12px 18px 4px; font-size: 11px; font-weight: 600; color: #5E574E; font-variant-numeric: tabular-nums; }
+  .screen .body { padding: 8px 16px 0; display: flex; flex-direction: column; gap: 13px; overflow: hidden; }
+  .s-head { display: flex; align-items: center; justify-content: space-between; }
+  .s-greet { font-size: 11px; color: #5E574E; }
+  .s-name { font-family: var(--display); font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
+  .s-av { width: 36px; height: 36px; border-radius: 50%; background: #1F5FDB; color: #fff; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+  .s-ask { background: #1F5FDB; color: #fff; border-radius: 17px; padding: 13px; display: flex; align-items: center; gap: 11px; }
+  .s-ask .t { font-size: 13px; font-weight: 600; }
+  .s-ask .b { font-size: 10.5px; opacity: 0.82; margin-top: 2px; }
+  .s-card { background: #F3F0EB; border-radius: 17px; padding: 15px; }
+  .s-card .lbl { font-family: var(--utility); font-size: 8.5px; letter-spacing: 0.12em; color: #1F5FDB; text-transform: uppercase; }
+  .s-card .h { font-family: var(--display); font-size: 16px; font-weight: 600; margin-top: 6px; letter-spacing: -0.01em; }
+  .s-card .p { font-size: 11px; color: #5E574E; margin-top: 5px; line-height: 1.45; }
+  .chips { display: flex; gap: 5px; margin-top: 11px; flex-wrap: wrap; }
+  .chip { background: #DCE6FF; color: #00174A; font-size: 9.5px; font-weight: 600; padding: 5px 9px; border-radius: 999px; }
+  .s-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .q { background: #F3F0EB; border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .q span { font-size: 10.5px; font-weight: 600; }
+  .s-nav {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px;
+    width: 236px; height: 46px; border-radius: 999px;
+    background: rgba(255,253,250,0.72);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border: 1px solid rgba(40,32,24,0.10); box-shadow: 0 8px 20px rgba(26,20,9,0.16);
+    display: flex; align-items: center; padding: 0 4px;
+  }
+  .s-nav .pill { position: absolute; left: 7px; width: 42px; height: 34px; border-radius: 999px; background: rgba(31,95,219,0.13); }
+  .s-nav .t { flex: 1; display: grid; place-items: center; z-index: 1; }
+
+  section { padding-block: clamp(56px, 8vw, 104px); }
+  .section-head { display: flex; flex-direction: column; gap: 14px; max-width: var(--measure); margin-bottom: clamp(32px, 5vw, 54px); }
+  .section-head p { color: var(--muted); }
+  .rule-top { border-top: 1px solid var(--rule); }
+
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 20px; overflow: hidden; }
+  .feature { background: var(--paper); padding: 30px 26px; display: flex; flex-direction: column; gap: 13px; }
+  .feature p { color: var(--muted); font-size: 0.95rem; }
+
+  /* A genuine sequence, so the numbering carries information. The left rule
+     is the margin line off a school exercise book. */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(24px, 4vw, 44px); }
+  .step { display: flex; flex-direction: column; gap: 12px; padding-left: 20px; border-left: 2px solid var(--margin-rule); }
+  .step .n { font-family: var(--utility); font-size: 0.78rem; color: var(--brand); letter-spacing: 0.08em; }
+  .step p { color: var(--muted); font-size: 0.95rem; }
+
+  .subjects { display: flex; flex-wrap: wrap; gap: 9px; }
+  .subject { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 9px 16px; font-size: 0.9rem; color: var(--muted); }
+
+  .download { background: var(--sunken); border-radius: 26px; padding: clamp(32px, 5vw, 56px); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; }
+  @media (max-width: 780px) { .download { grid-template-columns: minmax(0, 1fr); } }
+  .download p { color: var(--muted); margin-top: 12px; max-width: 48ch; }
+  .download h2 { margin-top: 12px; }
+  .spec { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 26px; font-family: var(--utility); font-size: 0.78rem; color: var(--faint); }
+  .spec b { display: block; color: var(--ink); font-family: var(--body); font-size: 0.95rem; font-weight: 600; margin-top: 3px; }
+
+  footer { border-top: 1px solid var(--rule); padding-block: 34px 46px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; color: var(--faint); font-size: 0.88rem; }
+  footer a { text-decoration: none; color: var(--muted); }
+  footer a:hover { color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="wordmark">
+      <span class="mark">
+        <svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M18 46V28a8 8 0 0 1 16 0v18M34 46V28a8 8 0 0 1 12-6.9" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+          <circle cx="46" cy="45" r="4" fill="#fff"></circle>
+        </svg>
+      </span>
+      Mentra
+    </div>
+    <nav>
+      <a href="#what" class="hide-sm">What it does</a>
+      <a href="#how" class="hide-sm">How it works</a>
+      <a href="#get">Download</a>
+    </nav>
+  </header>
+</div>
+
+<div class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Built for African learners</span>
+      <h1>Study from <em>your own</em> notes.</h1>
+      <p class="lede">Upload the PDF your lecturer actually gave you. Mentra reads it and answers from it — and tells you which page it found the answer on, so you can check.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/KenechukwuDani7/mentra/releases/latest">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M4.5 19h15"></path>
+          </svg>
+          Download for Android
+        </a>
+        <a class="btn btn-ghost" href="#what">See what it does</a>
+      </div>
+      <p class="meta">Free · Android 7+ · Try it before you sign in</p>
+    </div>
+
+    <div class="phone">
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+        <div class="body">
+          <div class="s-head">
+            <div>
+              <div class="s-greet">Good afternoon,</div>
+              <div class="s-name">Adaeze</div>
+            </div>
+            <div class="s-av">A</div>
+          </div>
+
+          <div class="s-ask">
+            <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="4" y="4" width="56" height="56" rx="18" fill="rgba(255,255,255,0.18)"></rect>
+              <path d="M19 22h26a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H31l-8 5.5V42h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4Z" fill="#fff"></path>
+              <path d="M43.5 13c.7 3.4 1.4 4.1 4.8 4.8-3.4.7-4.1 1.4-4.8 4.8-.7-3.4-1.4-4.1-4.8-4.8 3.4-.7 4.1-1.4 4.8-4.8Z" fill="#fff"></path>
+            </svg>
+            <div>
+              <div class="t">Ask Mentra anything</div>
+              <div class="b">Answers from your own materials</div>
+            </div>
+          </div>
+
+          <div class="s-card">
+            <div class="lbl">Your study space</div>
+            <div class="h">3 materials, 2 subjects</div>
+            <div class="p">Organic Chemistry — 62% read. Pick up on page 24.</div>
+            <div class="chips"><span class="chip">Chemistry</span><span class="chip">Biology</span></div>
+          </div>
+
+          <div class="s-quick">
+            <div class="q">
+              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+                <defs><linearGradient id="pu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6FA8FF"></stop><stop offset="1" stop-color="#1F5FDB"></stop></linearGradient></defs>
+                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pu)"></rect>
+                <path d="M32 19 L42 30 H36 V40 H28 V30 H22 Z" fill="#fff"></path><rect x="20" y="43" width="24" height="5" rx="2.5" fill="#fff"></rect>
+              </svg>
+              <span>Upload</span>
+            </div>
+            <div class="q">
+              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+                <defs><linearGradient id="pf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC46B"></stop><stop offset="1" stop-color="#E08A1E"></stop></linearGradient></defs>
+                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pf)"></rect>
+                <rect x="17" y="22" width="26" height="18" rx="4" fill="#fff" opacity="0.55"></rect><rect x="21" y="28" width="26" height="18" rx="4" fill="#fff"></rect>
+              </svg>
+              <span>Flashcards</span>
+            </div>
+            <div class="q">
+              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+                <defs><linearGradient id="pq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5FD8C4"></stop><stop offset="1" stop-color="#0F9C88"></stop></linearGradient></defs>
+                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pq)"></rect>
+                <path d="M26 26a6 6 0 1 1 8 5.6V35h-4v-5.2a2 2 0 0 1 1.4-1.9A2.4 2.4 0 1 0 30 26Z" fill="#fff"></path><rect x="29.6" y="38" width="4.6" height="4.6" rx="2.3" fill="#fff"></rect>
+              </svg>
+              <span>Take a quiz</span>
+            </div>
+            <div class="q">
+              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+                <defs><linearGradient id="pp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A99BFF"></stop><stop offset="1" stop-color="#6155D6"></stop></linearGradient></defs>
+                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pp)"></rect>
+                <rect x="18" y="23" width="28" height="23" rx="4" fill="#fff"></rect><rect x="23" y="19" width="4" height="8" rx="2" fill="#fff"></rect><rect x="37" y="19" width="4" height="8" rx="2" fill="#fff"></rect>
+                <rect x="18" y="23" width="28" height="7" rx="3.5" fill="#6155D6" opacity="0.55"></rect>
+              </svg>
+              <span>Plan study</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="s-nav">
+          <div class="pill"></div>
+          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2a8 8 0 0 1 16 0V19a2 2 0 0 1-2 2h-3.4v-4.6a2.6 2.6 0 0 0-5.2 0V21H6a2 2 0 0 1-2-2Z" fill="#1F5FDB"></path></svg></div>
+          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" aria-hidden="true"><rect x="3.5" y="5" width="4.6" height="14.5" rx="1.6"></rect><rect x="9.6" y="7" width="4.6" height="12.5" rx="1.6"></rect><path d="M16.6 6.2l3.4.9a1.6 1.6 0 0 1 1.1 2l-2.6 9.6a1.6 1.6 0 0 1-2 1.1l-1.1-.3" stroke-linejoin="round"></path></svg></div>
+          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="8.6"></circle><circle cx="12" cy="12" r="4.6"></circle><circle cx="12" cy="12" r="1.4" fill="#5E574E"></circle></svg></div>
+          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="3.4" y="5.4" width="17.2" height="15.2" rx="3.4"></rect><path d="M3.4 10.2h17.2M8 3.4v3.2M16 3.4v3.2"></path><circle cx="12" cy="15" r="1.5" fill="#5E574E"></circle></svg></div>
+          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path><circle cx="9" cy="7" r="2.6" fill="#FBFAF7"></circle><circle cx="15.5" cy="12" r="2.6" fill="#FBFAF7"></circle><circle cx="8" cy="17" r="2.6" fill="#FBFAF7"></circle></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <section id="what" class="rule-top">
+    <div class="section-head">
+      <span class="eyebrow">What it does</span>
+      <h2>Six tools, all pointed at the material you already have.</h2>
+      <p>Most study apps hand you someone else's content. Mentra works from yours — the lecture slides, the past questions, the textbook chapter you photographed.</p>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <h3>A tutor that read your file</h3>
+        <p>Ask a question and get an answer grounded in your document, with the page it came from. If your material doesn't cover it, Mentra says so instead of inventing an answer.</p>
+      </div>
+      <div class="feature">
+        <h3>Summaries that fit the subject</h3>
+        <p>A plain-language overview, the points worth revising, and an exam note — all drawn from that specific file, never a generic example borrowed from another subject.</p>
+      </div>
+      <div class="feature">
+        <h3>Flashcards and 30-question quizzes</h3>
+        <p>Generated from your material at your class level, with an explanation for every answer you get wrong.</p>
+      </div>
+      <div class="feature">
+        <h3>A solver that shows its working</h3>
+        <p>Type a maths or science problem, or photograph it. You get the method step by step, the final answer with units, and a check on whether it makes sense.</p>
+      </div>
+      <div class="feature">
+        <h3>A planner that actually reminds you</h3>
+        <p>Put study sessions, revision and exams on a calendar. Your phone alerts you at the time you chose, whether or not you have data.</p>
+      </div>
+      <div class="feature">
+        <h3>Reading progress worth trusting</h3>
+        <p>Mentra remembers how far into each file you got and reopens it there — no hunting for where you stopped last night.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" class="rule-top">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>Three steps, then it's yours.</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="n">STEP 1</span>
+        <h3>Add your material</h3>
+        <p>PDFs, Word documents, slides, spreadsheets, notes, or a photo of a page. Up to 25 MB each. Everything stays private to your account.</p>
+      </div>
+      <div class="step">
+        <span class="n">STEP 2</span>
+        <h3>Ask, or let it summarise</h3>
+        <p>Put your question in your own words. Mentra finds the relevant pages and answers from them, citing where it looked.</p>
+      </div>
+      <div class="step">
+        <span class="n">STEP 3</span>
+        <h3>Turn it into practice</h3>
+        <p>Build flashcards or a quiz from the same file, then schedule the revision so you actually come back to it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rule-top">
+    <div class="section-head">
+      <span class="eyebrow">Who it's for</span>
+      <h2>Primary school through university.</h2>
+      <p>Mentra asks your country, level and class when you sign up, then pitches explanations to match. A JSS 2 student and a 300-level undergraduate get different answers to the same question.</p>
+    </div>
+    <div class="subjects">
+      <span class="subject">Mathematics</span>
+      <span class="subject">English</span>
+      <span class="subject">Biology</span>
+      <span class="subject">Chemistry</span>
+      <span class="subject">Physics</span>
+      <span class="subject">Agricultural science</span>
+      <span class="subject">Economics</span>
+      <span class="subject">Government</span>
+      <span class="subject">Literature</span>
+      <span class="subject">…or any subject you add yourself</span>
+    </div>
+  </section>
+
+  <section id="get" class="rule-top">
+    <div class="download">
+      <div>
+        <span class="eyebrow">Get Mentra</span>
+        <h2>Download and start tonight.</h2>
+        <p>Mentra isn't on the Play Store yet. Download the APK, allow installation from unknown sources when Android asks, and you're in. Nothing to pay.</p>
+        <div class="spec">
+          <div>VERSION<b>1.3.1</b></div>
+          <div>SIZE<b>88 MB</b></div>
+          <div>REQUIRES<b>Android 7.0+</b></div>
+          <div>PRICE<b>Free</b></div>
+        </div>
+      </div>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/KenechukwuDani7/mentra/releases/latest">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M4.5 19h15"></path>
+          </svg>
+          Download the APK
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Mentra — an AI study companion for African learners.</span>
+    <span><a href="https://github.com/KenechukwuDani7/mentra">Source on GitHub</a></span>
+  </footer>
+</div>
