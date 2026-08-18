@@ -10,3 +10,6 @@ supabase/.temp/
 package-lock.before-repair.json
 .agents/
 .codex/
+
+.vercel
+.env*
