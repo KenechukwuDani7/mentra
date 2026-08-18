@@ -1,446 +1,699 @@
-<title>Mentra</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="An AI study companion for African learners. Upload your own notes and get explanations, flashcards, quizzes and a study plan built from them.">
-
-<style>
-  /* Tokens. Light lives on the bare :root so the un-stamped system default
-     resolves correctly; dark redefines only the values. */
-  :root {
-    --paper: #FBFAF7;
-    --surface: #FFFFFF;
-    --sunken: #F3F0EB;
-    --ink: #1A1713;
-    --muted: #5E574E;
-    --faint: #8B8378;
-    --rule: #E4DFD8;
-    --brand: #1F5FDB;
-    --brand-wash: #DCE6FF;
-    --on-brand: #FFFFFF;
-    --margin-rule: rgba(190, 78, 78, 0.30);
-    --ruled-line: rgba(26, 23, 19, 0.045);
-    --shadow: rgba(26, 20, 9, 0.10);
-    --shadow-deep: rgba(26, 20, 9, 0.16);
-
-    --display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
-    --body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --utility: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, monospace;
-
-    --measure: 62ch;
-    --gutter: clamp(20px, 5vw, 64px);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #0F0E0C;
-      --surface: #171613;
-      --sunken: #1F1D19;
-      --ink: #F2EFEA;
-      --muted: #ADA69C;
-      --faint: #7E766C;
-      --rule: #332F2A;
-      --brand: #A9C5FF;
-      --brand-wash: #16274A;
-      --on-brand: #00295E;
-      --margin-rule: rgba(224, 120, 120, 0.28);
-      --ruled-line: rgba(242, 239, 234, 0.05);
-      --shadow: rgba(0, 0, 0, 0.5);
-      --shadow-deep: rgba(0, 0, 0, 0.66);
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fbfaf7">
+  <meta name="description" content="Mentra turns study materials into clear explanations, grounded answers, practice questions, flashcards, and focused study plans.">
+  <meta property="og:title" content="Mentra — Study smarter, achieve more">
+  <meta property="og:description" content="A focused study companion built for African learners, from primary school to university.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="mentra-hero.png">
+  <title>Mentra — Study smarter, achieve more</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <style>
+    :root {
+      --paper: #fbfaf7;
+      --paper-2: #f3f1ec;
+      --ink: #10131a;
+      --muted: #626872;
+      --line: #deddd8;
+      --blue: #1f5fdb;
+      --blue-dark: #174bad;
+      --blue-soft: #e9f0ff;
+      --white: #ffffff;
+      --coral: #eb7857;
+      --amber: #dba333;
+      --mint: #0d9273;
+      --radius: 28px;
+      --shadow: 0 24px 70px rgba(18, 24, 38, .10);
+      --wrap: min(1180px, calc(100% - 40px));
     }
-  }
 
-  :root[data-theme="dark"] {
-    --paper: #0F0E0C;
-    --surface: #171613;
-    --sunken: #1F1D19;
-    --ink: #F2EFEA;
-    --muted: #ADA69C;
-    --faint: #7E766C;
-    --rule: #332F2A;
-    --brand: #A9C5FF;
-    --brand-wash: #16274A;
-    --on-brand: #00295E;
-    --margin-rule: rgba(224, 120, 120, 0.28);
-    --ruled-line: rgba(242, 239, 234, 0.05);
-    --shadow: rgba(0, 0, 0, 0.5);
-    --shadow-deep: rgba(0, 0, 0, 0.66);
-  }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    body.menu-open { overflow: hidden; }
+    a { color: inherit; text-decoration: none; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    img, video { display: block; max-width: 100%; }
+    .wrap { width: var(--wrap); margin-inline: auto; }
+    .section { padding: 112px 0; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 18px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 26px; height: 2px; background: currentColor; }
+    .section-title {
+      max-width: 760px;
+      margin: 0;
+      font-family: "Plus Jakarta Sans", sans-serif;
+      font-size: clamp(38px, 5vw, 68px);
+      line-height: .99;
+      letter-spacing: -.055em;
+    }
+    .section-copy {
+      max-width: 650px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: clamp(17px, 2vw, 20px);
+      line-height: 1.7;
+    }
+    .button {
+      min-height: 54px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 22px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 800;
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
+    }
+    .button:hover { transform: translateY(-2px); }
+    .button-primary { background: var(--blue); color: var(--white); box-shadow: 0 10px 24px rgba(31, 95, 219, .24); }
+    .button-primary:hover { background: var(--blue-dark); }
+    .button-ghost { border-color: rgba(255,255,255,.42); color: var(--white); background: rgba(16, 19, 26, .26); backdrop-filter: blur(12px); }
+    .button-light { background: var(--white); color: var(--ink); }
+    .button svg { width: 18px; height: 18px; }
 
-  * { box-sizing: border-box; }
+    .site-header {
+      position: fixed;
+      z-index: 30;
+      top: 18px;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+    }
+    .nav-shell {
+      width: min(1120px, calc(100% - 28px));
+      min-height: 68px;
+      margin: 0 auto;
+      padding: 10px 12px 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 999px;
+      background: rgba(251,250,247,.90);
+      box-shadow: 0 12px 40px rgba(19, 24, 35, .10);
+      backdrop-filter: blur(18px);
+      pointer-events: auto;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-family: "Plus Jakarta Sans", sans-serif; font-size: 19px; font-weight: 800; letter-spacing: -.03em; }
+    .brand img { width: 38px; height: 38px; object-fit: cover; border-radius: 50%; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a { color: #3d424b; font-size: 14px; font-weight: 700; }
+    .nav-links a:hover { color: var(--blue); }
+    .nav-cta { min-height: 46px; padding-inline: 18px; }
+    .menu-toggle { display: none; width: 46px; height: 46px; border: 0; border-radius: 50%; background: var(--ink); color: white; }
 
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--body);
-    font-size: 17px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+    .hero { padding: 104px 0 24px; }
+    .hero-card {
+      position: relative;
+      min-height: min(780px, calc(100svh - 128px));
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      border-radius: 38px;
+      background: #d9d7d0 url("mentra-hero.png") center / cover no-repeat;
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(90deg, rgba(9,14,24,.92) 0%, rgba(9,14,24,.76) 37%, rgba(9,14,24,.18) 67%, rgba(9,14,24,.05) 100%);
+    }
+    .hero-content { width: min(660px, 62%); padding: clamp(42px, 7vw, 86px); color: var(--white); }
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 26px;
+      padding: 9px 13px;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 999px;
+      background: rgba(16,19,26,.26);
+      backdrop-filter: blur(12px);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      max-width: 650px;
+      font-family: "Plus Jakarta Sans", sans-serif;
+      font-size: clamp(52px, 7.2vw, 92px);
+      line-height: .93;
+      letter-spacing: -.065em;
+    }
+    .hero-copy { max-width: 570px; margin: 26px 0 0; color: rgba(255,255,255,.82); font-size: clamp(17px, 2vw, 21px); line-height: 1.65; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+    .hero-proof { display: flex; flex-wrap: wrap; gap: 16px 24px; margin-top: 42px; color: rgba(255,255,255,.78); font-size: 13px; font-weight: 700; }
+    .hero-proof span { display: inline-flex; align-items: center; gap: 8px; }
+    .hero-proof svg { width: 17px; height: 17px; color: #85aefb; }
+    .float-card {
+      position: absolute;
+      right: 38px;
+      bottom: 34px;
+      width: min(350px, 34%);
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.50);
+      border-radius: 22px;
+      background: rgba(251,250,247,.88);
+      box-shadow: 0 20px 48px rgba(0,0,0,.16);
+      backdrop-filter: blur(18px);
+    }
+    .float-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .float-label { color: #5d636c; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+    .float-status { padding: 6px 9px; border-radius: 999px; background: #e4f5ed; color: #087357; font-size: 10px; font-weight: 800; }
+    .float-title { margin: 18px 0 0; font-family: "Plus Jakarta Sans"; font-size: 22px; line-height: 1.15; letter-spacing: -.04em; }
+    .float-row { display: flex; gap: 8px; margin-top: 16px; }
+    .float-chip { padding: 8px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-size: 11px; font-weight: 800; }
 
-  .wrap { max-width: 1140px; margin: 0 auto; padding-inline: var(--gutter); }
+    .trust-strip { padding: 26px 0 72px; }
+    .trust-inner { display: grid; grid-template-columns: 1.15fr repeat(3, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .trust-item { min-height: 112px; padding: 24px 30px; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid var(--line); }
+    .trust-item:first-child { border-left: 0; padding-left: 0; }
+    .trust-kicker { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .trust-value { margin-top: 8px; font-family: "Plus Jakarta Sans"; font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
 
-  h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; }
-  h1 { font-size: clamp(2.6rem, 6vw, 4.1rem); line-height: 1.04; letter-spacing: -0.025em; }
-  h2 { font-size: clamp(1.9rem, 3.6vw, 2.7rem); line-height: 1.12; letter-spacing: -0.02em; }
-  h3 { font-size: 1.22rem; line-height: 1.3; letter-spacing: -0.01em; }
-  p { margin: 0; }
+    .feature-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 48px; margin-bottom: 50px; }
+    .feature-head .section-copy { max-width: 430px; margin: 0; }
+    .feature-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
+    .feature-card {
+      position: relative;
+      min-height: 310px;
+      padding: 30px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--white);
+    }
+    .feature-card:nth-child(1), .feature-card:nth-child(4) { grid-column: span 7; }
+    .feature-card:nth-child(2), .feature-card:nth-child(3) { grid-column: span 5; }
+    .feature-card:nth-child(5), .feature-card:nth-child(6) { grid-column: span 6; }
+    .feature-card.dark { background: var(--ink); color: var(--white); border-color: var(--ink); }
+    .feature-icon { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 16px; background: var(--blue-soft); color: var(--blue); }
+    .feature-card.dark .feature-icon { background: #20325e; color: #83aaf7; }
+    .feature-icon svg { width: 24px; height: 24px; stroke-width: 1.8; }
+    .feature-number { position: absolute; top: 31px; right: 30px; color: #a9adb4; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+    .feature-card h3 { margin: 74px 0 0; max-width: 470px; font-family: "Plus Jakarta Sans"; font-size: clamp(25px, 3vw, 36px); line-height: 1.07; letter-spacing: -.05em; }
+    .feature-card p { max-width: 520px; margin: 15px 0 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .feature-card.dark p { color: #b7bcc5; }
+    .and-more { margin-top: 18px; padding: 24px 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper-2); }
+    .and-more strong { font-family: "Plus Jakarta Sans"; font-size: 20px; }
+    .more-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; }
+    .more-list span { padding: 9px 12px; border: 1px solid #d2d0ca; border-radius: 999px; background: var(--paper); color: #4f545d; font-size: 12px; font-weight: 800; }
 
-  .eyebrow {
-    font-family: var(--utility);
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--faint);
-  }
+    .steps-section { background: var(--paper-2); }
+    .steps-layout { display: grid; grid-template-columns: .82fr 1.18fr; gap: clamp(50px, 8vw, 110px); align-items: start; }
+    .steps-intro { position: sticky; top: 130px; }
+    .steps { display: grid; gap: 16px; }
+    .step { min-height: 220px; display: grid; grid-template-columns: 72px 1fr; gap: 22px; padding: 30px; border: 1px solid #d8d6d0; border-radius: var(--radius); background: var(--paper); }
+    .step-number { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--white); font-family: "Plus Jakarta Sans"; font-size: 18px; font-weight: 800; }
+    .step h3 { margin: 5px 0 0; font-family: "Plus Jakarta Sans"; font-size: 28px; letter-spacing: -.045em; }
+    .step p { margin: 12px 0 0; color: var(--muted); line-height: 1.7; }
+    .step-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .step-tags span { padding: 8px 10px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-size: 11px; font-weight: 800; }
 
-  a { color: inherit; }
-  a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+    .demo-section { background: var(--ink); color: var(--white); overflow: hidden; }
+    .demo-head { display: grid; grid-template-columns: 1fr .72fr; align-items: end; gap: 60px; }
+    .demo-head .section-copy { color: #adb3bd; }
+    .demo-head .eyebrow { color: #8eb2fb; }
+    .demo-stage { margin-top: 60px; display: grid; grid-template-columns: 1fr minmax(290px, 390px) 1fr; gap: 24px; align-items: center; }
+    .demo-note { min-height: 170px; padding: 25px; border: 1px solid #323743; border-radius: 24px; background: #171b24; }
+    .demo-note svg { width: 24px; height: 24px; color: #8eb2fb; }
+    .demo-note h3 { margin: 34px 0 0; font-family: "Plus Jakarta Sans"; font-size: 21px; letter-spacing: -.035em; }
+    .demo-note p { margin: 10px 0 0; color: #9da4af; font-size: 14px; line-height: 1.65; }
+    .phone-frame {
+      position: relative;
+      padding: 9px;
+      border: 2px solid #4a4f59;
+      border-radius: 38px;
+      background: #111318;
+      box-shadow: 0 30px 80px rgba(0,0,0,.45);
+    }
+    .phone-frame::before {
+      content: "";
+      position: absolute;
+      z-index: 3;
+      top: 17px;
+      left: 50%;
+      width: 10px;
+      height: 10px;
+      transform: translateX(-50%);
+      border: 2px solid #31343b;
+      border-radius: 50%;
+      background: #050608;
+      box-shadow: 0 0 0 2px rgba(255,255,255,.05);
+      pointer-events: none;
+    }
+    .phone-frame::after {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 122px;
+      width: 3px;
+      height: 72px;
+      border-radius: 0 4px 4px 0;
+      background: #565b65;
+    }
+    .phone-frame video {
+      width: 100%;
+      height: auto;
+      max-height: 760px;
+      border-radius: 29px;
+      object-fit: contain;
+      background: #000;
+    }
+    .demo-caption { margin-top: 18px; color: #8d94a0; font-size: 12px; text-align: center; }
 
-  .masthead {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 20px; padding-block: 26px;
-  }
-  .wordmark { display: flex; align-items: center; gap: 11px; font-family: var(--display); font-size: 1.32rem; font-weight: 600; letter-spacing: -0.02em; }
-  .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--brand); display: grid; place-items: center; flex: none; }
-  .masthead nav { display: flex; gap: 26px; align-items: center; font-size: 0.94rem; color: var(--muted); }
-  .masthead nav a { text-decoration: none; }
-  .masthead nav a:hover { color: var(--ink); }
-  @media (max-width: 720px) { .masthead nav .hide-sm { display: none; } }
+    .grounded-layout { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(45px, 8vw, 100px); align-items: center; }
+    .grounded-card { padding: 26px; border: 1px solid var(--line); border-radius: 32px; background: var(--white); box-shadow: var(--shadow); }
+    .doc-top { display: flex; align-items: center; gap: 14px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+    .doc-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: #f2eefe; color: #6c5bd3; }
+    .doc-top strong { display: block; font-size: 14px; }
+    .doc-top span { color: var(--muted); font-size: 12px; }
+    .answer-card { margin-top: 18px; padding: 22px; border-radius: 20px; background: var(--blue-soft); }
+    .answer-label { color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .answer-card h3 { margin: 12px 0 0; font-family: "Plus Jakarta Sans"; font-size: 24px; letter-spacing: -.04em; }
+    .answer-card p { margin: 10px 0 0; color: #475066; line-height: 1.65; }
+    .citation { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; padding: 8px 10px; border-radius: 10px; background: white; color: var(--blue); font-size: 11px; font-weight: 800; }
+    .citation svg { width: 14px; height: 14px; }
+    .grounded-points { display: grid; gap: 18px; margin-top: 32px; }
+    .grounded-point { display: grid; grid-template-columns: 42px 1fr; gap: 14px; align-items: start; }
+    .grounded-point .mini { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: var(--paper-2); color: var(--blue); }
+    .grounded-point h3 { margin: 1px 0 0; font-size: 16px; }
+    .grounded-point p { margin: 5px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 
-  .hero { position: relative; padding-block: clamp(30px, 5vw, 66px) clamp(56px, 8vw, 104px); overflow: hidden; }
-  /* Ruled like an exercise book, hero only, so it reads as stock rather than
-     a motif hammered through every section. */
-  .hero::before {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: repeating-linear-gradient(to bottom, transparent 0 33px, var(--ruled-line) 33px 34px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 100%);
-  }
-  .hero > * { position: relative; }
-  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: clamp(32px, 6vw, 76px); align-items: center; }
-  @media (max-width: 900px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
+    .for-learners { padding-top: 0; }
+    .learner-card { display: grid; grid-template-columns: 1.12fr .88fr; overflow: hidden; border-radius: 34px; background: var(--blue); color: white; }
+    .learner-copy { padding: clamp(42px, 7vw, 78px); }
+    .learner-copy .eyebrow { color: #c8d9ff; }
+    .learner-copy .section-copy { color: #d9e4ff; }
+    .learner-list { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 30px; }
+    .learner-list span { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; }
+    .learner-list svg { width: 18px; height: 18px; }
+    .learner-visual { min-height: 520px; background: url("mentra-hero.png") 75% center / cover no-repeat; }
 
-  .hero-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
-  .hero-copy h1 { max-width: 13ch; }
-  .hero-copy .lede { font-size: 1.16rem; color: var(--muted); max-width: 46ch; }
-  .hero-copy .meta { max-width: 46ch; }
-  h1 em { font-style: normal; color: var(--brand); }
+    .faq-layout { display: grid; grid-template-columns: .75fr 1.25fr; gap: 90px; }
+    .faq-list { border-top: 1px solid var(--line); }
+    details { border-bottom: 1px solid var(--line); }
+    summary { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 30px; cursor: pointer; list-style: none; font-family: "Plus Jakarta Sans"; font-size: 18px; font-weight: 800; letter-spacing: -.025em; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; font-family: "Manrope"; font-size: 20px; font-weight: 500; }
+    details[open] summary::after { content: "−"; }
+    details p { max-width: 680px; margin: -2px 50px 28px 0; color: var(--muted); line-height: 1.7; }
 
-  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 9px;
-    font: inherit; font-weight: 600; font-size: 1rem;
-    padding: 14px 24px; border-radius: 999px; text-decoration: none;
-    border: 1.5px solid transparent; cursor: pointer;
-    transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
-  }
-  .btn-primary { background: var(--brand); color: var(--on-brand); box-shadow: 0 6px 18px var(--shadow); }
-  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px var(--shadow-deep); }
-  .btn-ghost { border-color: var(--rule); color: var(--ink); }
-  .btn-ghost:hover { background: var(--sunken); }
+    .final-cta { padding: 0 0 26px; }
+    .cta-card { padding: clamp(46px, 8vw, 92px); border-radius: 36px; background: var(--ink); color: white; text-align: center; }
+    .cta-card .section-title { max-width: 800px; margin-inline: auto; }
+    .cta-card p { max-width: 610px; margin: 22px auto 0; color: #aeb4be; font-size: 18px; line-height: 1.65; }
+    .cta-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 32px; }
+    .coming-soon { margin-top: 16px; color: #7f8794; font-size: 12px; font-weight: 700; }
 
-  .meta { font-family: var(--utility); font-size: 0.78rem; color: var(--faint); letter-spacing: 0.02em; }
+    footer { padding: 34px 0 max(34px, env(safe-area-inset-bottom)); }
+    .footer-inner { display: grid; grid-template-columns: 1.3fr .7fr .7fr; gap: 44px; align-items: end; }
+    .footer-copy { max-width: 420px; margin: 16px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .footer-col strong { display: block; margin-bottom: 12px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+    .footer-col a { display: block; width: fit-content; margin: 9px 0; color: var(--muted); font-size: 14px; }
+    .footer-col a:hover { color: var(--blue); }
+    .copyright { grid-column: 1 / -1; padding-top: 28px; border-top: 1px solid var(--line); color: #858991; font-size: 12px; }
 
-  /* The phone shows the real Home screen, rebuilt from the app's own tokens. */
-  .phone {
-    width: 300px; justify-self: center;
-    border-radius: 38px; padding: 9px;
-    background: linear-gradient(160deg, #2C2A26, #131211);
-    box-shadow: 0 30px 60px var(--shadow-deep);
-  }
-  .screen {
-    border-radius: 30px; overflow: hidden; position: relative;
-    background: #FBFAF7; color: #1A1713;
-    height: 594px; display: flex; flex-direction: column;
-  }
-  .screen .status { display: flex; justify-content: space-between; padding: 12px 18px 4px; font-size: 11px; font-weight: 600; color: #5E574E; font-variant-numeric: tabular-nums; }
-  .screen .body { padding: 8px 16px 0; display: flex; flex-direction: column; gap: 13px; overflow: hidden; }
-  .s-head { display: flex; align-items: center; justify-content: space-between; }
-  .s-greet { font-size: 11px; color: #5E574E; }
-  .s-name { font-family: var(--display); font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
-  .s-av { width: 36px; height: 36px; border-radius: 50%; background: #1F5FDB; color: #fff; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
-  .s-ask { background: #1F5FDB; color: #fff; border-radius: 17px; padding: 13px; display: flex; align-items: center; gap: 11px; }
-  .s-ask .t { font-size: 13px; font-weight: 600; }
-  .s-ask .b { font-size: 10.5px; opacity: 0.82; margin-top: 2px; }
-  .s-card { background: #F3F0EB; border-radius: 17px; padding: 15px; }
-  .s-card .lbl { font-family: var(--utility); font-size: 8.5px; letter-spacing: 0.12em; color: #1F5FDB; text-transform: uppercase; }
-  .s-card .h { font-family: var(--display); font-size: 16px; font-weight: 600; margin-top: 6px; letter-spacing: -0.01em; }
-  .s-card .p { font-size: 11px; color: #5E574E; margin-top: 5px; line-height: 1.45; }
-  .chips { display: flex; gap: 5px; margin-top: 11px; flex-wrap: wrap; }
-  .chip { background: #DCE6FF; color: #00174A; font-size: 9.5px; font-weight: 600; padding: 5px 9px; border-radius: 999px; }
-  .s-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-  .q { background: #F3F0EB; border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-  .q span { font-size: 10.5px; font-weight: 600; }
-  .s-nav {
-    position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px;
-    width: 236px; height: 46px; border-radius: 999px;
-    background: rgba(255,253,250,0.72);
-    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-    border: 1px solid rgba(40,32,24,0.10); box-shadow: 0 8px 20px rgba(26,20,9,0.16);
-    display: flex; align-items: center; padding: 0 4px;
-  }
-  .s-nav .pill { position: absolute; left: 7px; width: 42px; height: 34px; border-radius: 999px; background: rgba(31,95,219,0.13); }
-  .s-nav .t { flex: 1; display: grid; place-items: center; z-index: 1; }
+    .reveal { opacity: 1; transform: none; }
+    .skip-link { position: fixed; z-index: 99; left: 20px; top: -80px; padding: 12px 16px; border-radius: 12px; background: var(--ink); color: white; font-weight: 800; }
+    .skip-link:focus { top: 18px; }
 
-  section { padding-block: clamp(56px, 8vw, 104px); }
-  .section-head { display: flex; flex-direction: column; gap: 14px; max-width: var(--measure); margin-bottom: clamp(32px, 5vw, 54px); }
-  .section-head p { color: var(--muted); }
-  .rule-top { border-top: 1px solid var(--rule); }
+    @media (max-width: 940px) {
+      :root { --wrap: min(100% - 28px, 760px); }
+      .nav-links { display: none; position: fixed; inset: 92px 14px auto; padding: 24px; flex-direction: column; align-items: stretch; border: 1px solid var(--line); border-radius: 26px; background: var(--paper); box-shadow: var(--shadow); }
+      .nav-links.open { display: flex; }
+      .nav-links a { padding: 10px 4px; font-size: 17px; }
+      .nav-links .button { color: white; }
+      .menu-toggle { display: grid; place-items: center; }
+      .hero-card { min-height: 760px; align-items: flex-end; background-position: 60% center; }
+      .hero-card::before { background: linear-gradient(0deg, rgba(9,14,24,.95) 0%, rgba(9,14,24,.66) 54%, rgba(9,14,24,.10) 100%); }
+      .hero-content { width: 100%; padding: 44px; }
+      .hero-content h1 { max-width: 620px; }
+      .float-card { display: none; }
+      .trust-inner { grid-template-columns: 1fr 1fr; }
+      .trust-item:nth-child(3) { border-left: 0; }
+      .feature-head, .demo-head { display: block; }
+      .feature-head .section-copy { max-width: 650px; margin-top: 22px; }
+      .feature-card:nth-child(n) { grid-column: span 6; min-height: 300px; }
+      .steps-layout, .grounded-layout, .faq-layout { grid-template-columns: 1fr; }
+      .steps-intro { position: static; }
+      .demo-stage { grid-template-columns: 1fr minmax(280px, 390px) 1fr; }
+      .demo-note { padding: 20px; }
+      .learner-card { grid-template-columns: 1fr; }
+      .learner-visual { min-height: 420px; background-position: center; }
+      .faq-layout { gap: 42px; }
+    }
 
-  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 20px; overflow: hidden; }
-  .feature { background: var(--paper); padding: 30px 26px; display: flex; flex-direction: column; gap: 13px; }
-  .feature p { color: var(--muted); font-size: 0.95rem; }
+    @media (max-width: 680px) {
+      :root { --wrap: calc(100% - 20px); --radius: 22px; }
+      .section { padding: 82px 0; }
+      .site-header { top: 10px; }
+      .nav-shell { width: calc(100% - 20px); min-height: 60px; padding: 7px 8px 7px 12px; }
+      .brand img { width: 34px; height: 34px; }
+      .brand { font-size: 17px; }
+      .menu-toggle { width: 44px; height: 44px; }
+      .hero { padding-top: 80px; }
+      .hero-card { min-height: 720px; border-radius: 26px; background-position: 67% center; }
+      .hero-content { padding: 34px 24px 38px; }
+      h1 { font-size: clamp(48px, 15vw, 67px); }
+      .hero-copy { font-size: 16px; }
+      .hero-actions { align-items: stretch; }
+      .hero-actions .button { flex: 1 1 100%; }
+      .hero-proof { display: grid; gap: 11px; }
+      .trust-strip { padding-bottom: 34px; }
+      .trust-inner { grid-template-columns: 1fr; }
+      .trust-item, .trust-item:first-child { min-height: 88px; padding: 18px 4px; border-left: 0; border-top: 1px solid var(--line); }
+      .trust-item:first-child { border-top: 0; }
+      .feature-grid { display: grid; grid-template-columns: 1fr; }
+      .feature-card:nth-child(n) { grid-column: auto; min-height: 280px; padding: 24px; }
+      .feature-card h3 { margin-top: 58px; }
+      .and-more { align-items: flex-start; flex-direction: column; }
+      .more-list { justify-content: flex-start; }
+      .step { grid-template-columns: 52px 1fr; padding: 22px; }
+      .step-number { width: 48px; height: 48px; }
+      .step h3 { font-size: 23px; }
+      .demo-stage { grid-template-columns: 1fr; }
+      .demo-note { min-height: 0; }
+      .phone-frame { width: min(100%, 360px); margin: 0 auto; order: -1; }
+      .grounded-card { padding: 18px; }
+      .learner-copy { padding: 38px 24px; }
+      .learner-list { grid-template-columns: 1fr; }
+      .learner-visual { min-height: 340px; }
+      .cta-card { border-radius: 26px; padding-inline: 24px; }
+      .cta-actions .button { flex: 1 1 100%; }
+      .footer-inner { grid-template-columns: 1fr 1fr; }
+      .footer-main { grid-column: 1 / -1; }
+    }
 
-  /* A genuine sequence, so the numbering carries information. The left rule
-     is the margin line off a school exercise book. */
-  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(24px, 4vw, 44px); }
-  .step { display: flex; flex-direction: column; gap: 12px; padding-left: 20px; border-left: 2px solid var(--margin-rule); }
-  .step .n { font-family: var(--utility); font-size: 0.78rem; color: var(--brand); letter-spacing: 0.08em; }
-  .step p { color: var(--muted); font-size: 0.95rem; }
+    @media (max-width: 360px) {
+      .nav-shell { width: calc(100% - 14px); }
+      .brand { gap: 7px; font-size: 15px; }
+      .brand img { width: 32px; height: 32px; }
+      .menu-toggle { width: 40px; height: 40px; }
+      .hero-card { min-height: 700px; }
+      .hero-content { padding: 28px 18px 32px; }
+      .hero-pill { padding: 8px 10px; font-size: 10px; letter-spacing: .06em; }
+      h1 { font-size: clamp(40px, 13.5vw, 49px); line-height: .96; }
+      .hero-copy { margin-top: 18px; font-size: 15px; }
+      .hero-actions { margin-top: 24px; }
+      .hero-proof { margin-top: 26px; font-size: 12px; }
+      .section-title { font-size: 36px; }
+      .feature-card h3 { font-size: 25px; }
+      .step { grid-template-columns: 1fr; }
+      .step-number { width: 44px; height: 44px; }
+      .footer-inner { grid-template-columns: 1fr; }
+      .footer-main { grid-column: auto; }
+    }
 
-  .subjects { display: flex; flex-wrap: wrap; gap: 9px; }
-  .subject { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 9px 16px; font-size: 0.9rem; color: var(--muted); }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-  .download { background: var(--sunken); border-radius: 26px; padding: clamp(32px, 5vw, 56px); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; }
-  @media (max-width: 780px) { .download { grid-template-columns: minmax(0, 1fr); } }
-  .download p { color: var(--muted); margin-top: 12px; max-width: 48ch; }
-  .download h2 { margin-top: 12px; }
-  .spec { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 26px; font-family: var(--utility); font-size: 0.78rem; color: var(--faint); }
-  .spec b { display: block; color: var(--ink); font-family: var(--body); font-size: 0.95rem; font-weight: 600; margin-top: 3px; }
-
-  footer { border-top: 1px solid var(--rule); padding-block: 34px 46px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; color: var(--faint); font-size: 0.88rem; }
-  footer a { text-decoration: none; color: var(--muted); }
-  footer a:hover { color: var(--ink); }
-
-  @media (prefers-reduced-motion: reduce) {
-    * { animation: none !important; transition: none !important; }
-  }
-</style>
-
-<div class="wrap">
-  <header class="masthead">
-    <div class="wordmark">
-      <span class="mark">
-        <svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M18 46V28a8 8 0 0 1 16 0v18M34 46V28a8 8 0 0 1 12-6.9" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
-          <circle cx="46" cy="45" r="4" fill="#fff"></circle>
-        </svg>
-      </span>
-      Mentra
+  <header class="site-header" aria-label="Primary navigation">
+    <div class="nav-shell">
+      <a class="brand" href="#top" aria-label="Mentra home">
+        <img src="mentra-mark.png" alt="">
+        <span>Mentra</span>
+      </a>
+      <nav class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#demo">Demo</a>
+        <a href="#faq">FAQ</a>
+        <a class="button button-primary nav-cta" href="https://github.com/KenechukwuDani7/mentra/releases/latest">Get the Android app <i data-lucide="arrow-up-right"></i></a>
+      </nav>
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks"><i data-lucide="menu"></i></button>
     </div>
-    <nav>
-      <a href="#what" class="hide-sm">What it does</a>
-      <a href="#how" class="hide-sm">How it works</a>
-      <a href="#get">Download</a>
-    </nav>
   </header>
-</div>
 
-<div class="hero">
-  <div class="wrap hero-grid">
-    <div class="hero-copy">
-      <span class="eyebrow">Built for African learners</span>
-      <h1>Study from <em>your own</em> notes.</h1>
-      <p class="lede">Upload the PDF your lecturer actually gave you. Mentra reads it and answers from it — and tells you which page it found the answer on, so you can check.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/KenechukwuDani7/mentra/releases/latest">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M4.5 19h15"></path>
-          </svg>
-          Download for Android
-        </a>
-        <a class="btn btn-ghost" href="#what">See what it does</a>
-      </div>
-      <p class="meta">Free · Android 7+ · Try it before you sign in</p>
-    </div>
-
-    <div class="phone">
-      <div class="screen">
-        <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
-        <div class="body">
-          <div class="s-head">
-            <div>
-              <div class="s-greet">Good afternoon,</div>
-              <div class="s-name">Adaeze</div>
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <div class="hero-card">
+          <div class="hero-content reveal">
+            <div class="hero-pill">Built for African learners</div>
+            <h1>Turn every study session into real progress.</h1>
+            <p class="hero-copy">Mentra helps you understand difficult topics, learn from your own materials, practise with purpose, and stay ready for what comes next.</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="https://github.com/KenechukwuDani7/mentra/releases/latest">Download for Android <i data-lucide="download"></i></a>
+              <a class="button button-ghost" href="#demo"><i data-lucide="play"></i> See Mentra in action</a>
             </div>
-            <div class="s-av">A</div>
-          </div>
-
-          <div class="s-ask">
-            <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
-              <rect x="4" y="4" width="56" height="56" rx="18" fill="rgba(255,255,255,0.18)"></rect>
-              <path d="M19 22h26a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H31l-8 5.5V42h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4Z" fill="#fff"></path>
-              <path d="M43.5 13c.7 3.4 1.4 4.1 4.8 4.8-3.4.7-4.1 1.4-4.8 4.8-.7-3.4-1.4-4.1-4.8-4.8 3.4-.7 4.1-1.4 4.8-4.8Z" fill="#fff"></path>
-            </svg>
-            <div>
-              <div class="t">Ask Mentra anything</div>
-              <div class="b">Answers from your own materials</div>
+            <div class="hero-proof">
+              <span><i data-lucide="file-check-2"></i> Learn from your own files</span>
+              <span><i data-lucide="shield-check"></i> Answers grounded in your materials</span>
+              <span><i data-lucide="languages"></i> Built for different learners</span>
             </div>
           </div>
-
-          <div class="s-card">
-            <div class="lbl">Your study space</div>
-            <div class="h">3 materials, 2 subjects</div>
-            <div class="p">Organic Chemistry — 62% read. Pick up on page 24.</div>
-            <div class="chips"><span class="chip">Chemistry</span><span class="chip">Biology</span></div>
-          </div>
-
-          <div class="s-quick">
-            <div class="q">
-              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
-                <defs><linearGradient id="pu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6FA8FF"></stop><stop offset="1" stop-color="#1F5FDB"></stop></linearGradient></defs>
-                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pu)"></rect>
-                <path d="M32 19 L42 30 H36 V40 H28 V30 H22 Z" fill="#fff"></path><rect x="20" y="43" width="24" height="5" rx="2.5" fill="#fff"></rect>
-              </svg>
-              <span>Upload</span>
-            </div>
-            <div class="q">
-              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
-                <defs><linearGradient id="pf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC46B"></stop><stop offset="1" stop-color="#E08A1E"></stop></linearGradient></defs>
-                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pf)"></rect>
-                <rect x="17" y="22" width="26" height="18" rx="4" fill="#fff" opacity="0.55"></rect><rect x="21" y="28" width="26" height="18" rx="4" fill="#fff"></rect>
-              </svg>
-              <span>Flashcards</span>
-            </div>
-            <div class="q">
-              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
-                <defs><linearGradient id="pq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5FD8C4"></stop><stop offset="1" stop-color="#0F9C88"></stop></linearGradient></defs>
-                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pq)"></rect>
-                <path d="M26 26a6 6 0 1 1 8 5.6V35h-4v-5.2a2 2 0 0 1 1.4-1.9A2.4 2.4 0 1 0 30 26Z" fill="#fff"></path><rect x="29.6" y="38" width="4.6" height="4.6" rx="2.3" fill="#fff"></rect>
-              </svg>
-              <span>Take a quiz</span>
-            </div>
-            <div class="q">
-              <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
-                <defs><linearGradient id="pp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A99BFF"></stop><stop offset="1" stop-color="#6155D6"></stop></linearGradient></defs>
-                <rect x="6" y="5" width="52" height="52" rx="17" fill="url(#pp)"></rect>
-                <rect x="18" y="23" width="28" height="23" rx="4" fill="#fff"></rect><rect x="23" y="19" width="4" height="8" rx="2" fill="#fff"></rect><rect x="37" y="19" width="4" height="8" rx="2" fill="#fff"></rect>
-                <rect x="18" y="23" width="28" height="7" rx="3.5" fill="#6155D6" opacity="0.55"></rect>
-              </svg>
-              <span>Plan study</span>
-            </div>
+          <div class="float-card reveal" aria-hidden="true">
+            <div class="float-top"><span class="float-label">Today's study plan</span><span class="float-status">On track</span></div>
+            <div class="float-title">Finish Algebra review before 7:30 PM</div>
+            <div class="float-row"><span class="float-chip">12 flashcards</span><span class="float-chip">1 reminder</span></div>
           </div>
         </div>
+      </div>
+    </section>
 
-        <div class="s-nav">
-          <div class="pill"></div>
-          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2a8 8 0 0 1 16 0V19a2 2 0 0 1-2 2h-3.4v-4.6a2.6 2.6 0 0 0-5.2 0V21H6a2 2 0 0 1-2-2Z" fill="#1F5FDB"></path></svg></div>
-          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" aria-hidden="true"><rect x="3.5" y="5" width="4.6" height="14.5" rx="1.6"></rect><rect x="9.6" y="7" width="4.6" height="12.5" rx="1.6"></rect><path d="M16.6 6.2l3.4.9a1.6 1.6 0 0 1 1.1 2l-2.6 9.6a1.6 1.6 0 0 1-2 1.1l-1.1-.3" stroke-linejoin="round"></path></svg></div>
-          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="8.6"></circle><circle cx="12" cy="12" r="4.6"></circle><circle cx="12" cy="12" r="1.4" fill="#5E574E"></circle></svg></div>
-          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="3.4" y="5.4" width="17.2" height="15.2" rx="3.4"></rect><path d="M3.4 10.2h17.2M8 3.4v3.2M16 3.4v3.2"></path><circle cx="12" cy="15" r="1.5" fill="#5E574E"></circle></svg></div>
-          <div class="t"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5E574E" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path><circle cx="9" cy="7" r="2.6" fill="#FBFAF7"></circle><circle cx="15.5" cy="12" r="2.6" fill="#FBFAF7"></circle><circle cx="8" cy="17" r="2.6" fill="#FBFAF7"></circle></svg></div>
+    <section class="trust-strip" aria-label="Mentra summary">
+      <div class="wrap trust-inner">
+        <div class="trust-item"><span class="trust-kicker">One focused place</span><span class="trust-value">Learn, practise and plan</span></div>
+        <div class="trust-item"><span class="trust-kicker">School stages</span><span class="trust-value">Primary to university</span></div>
+        <div class="trust-item"><span class="trust-kicker">Study formats</span><span class="trust-value">PDFs, notes and images</span></div>
+        <div class="trust-item"><span class="trust-kicker">Made for mobile</span><span class="trust-value">Android now, iOS next</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="feature-head reveal">
+          <div>
+            <p class="eyebrow">Six ways Mentra helps</p>
+            <h2 class="section-title">The tools you need. None of the clutter.</h2>
+          </div>
+          <p class="section-copy">Mentra brings your materials, explanations, practice and study plans together so you can spend less time organising and more time learning.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card dark reveal">
+            <div class="feature-icon"><i data-lucide="messages-square"></i></div><span class="feature-number">01</span>
+            <h3>Ask Mentra and get a clear answer.</h3>
+            <p>Ask about school topics or your uploaded materials. Mentra explains ideas at your level and keeps the conversation focused on learning.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon"><i data-lucide="notebook-tabs"></i></div><span class="feature-number">02</span>
+            <h3>Summaries that make revision lighter.</h3>
+            <p>Turn long documents into simple explanations, key points and exam-ready notes.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon"><i data-lucide="layers-3"></i></div><span class="feature-number">03</span>
+            <h3>Flashcards and quizzes from what you study.</h3>
+            <p>Build active-recall practice from your subjects or materials, with explanations after every answer.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon"><i data-lucide="square-function"></i></div><span class="feature-number">04</span>
+            <h3>See the full working, not just the answer.</h3>
+            <p>Type or photograph maths and science problems. Mentra breaks the solution into understandable steps you can learn from.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon"><i data-lucide="calendar-check-2"></i></div><span class="feature-number">05</span>
+            <h3>Plan study time around real life.</h3>
+            <p>Create tasks, set exam dates and receive reminders that help you keep moving without overwhelming you.</p>
+          </article>
+          <article class="feature-card dark reveal">
+            <div class="feature-icon"><i data-lucide="library-big"></i></div><span class="feature-number">06</span>
+            <h3>Your study library, organised by subject.</h3>
+            <p>Keep materials together, read PDFs in the app, return to where you stopped, and build progress from the subjects that matter to you.</p>
+          </article>
+        </div>
+
+        <div class="and-more reveal">
+          <strong>And more</strong>
+          <div class="more-list"><span>Multilingual interface</span><span>Custom subjects</span><span>Reading progress</span><span>Practice history</span><span>Light and dark mode</span></div>
         </div>
       </div>
-    </div>
-  </div>
-</div>
+    </section>
 
-<div class="wrap">
-  <section id="what" class="rule-top">
-    <div class="section-head">
-      <span class="eyebrow">What it does</span>
-      <h2>Six tools, all pointed at the material you already have.</h2>
-      <p>Most study apps hand you someone else's content. Mentra works from yours — the lecture slides, the past questions, the textbook chapter you photographed.</p>
-    </div>
-
-    <div class="features">
-      <div class="feature">
-        <h3>A tutor that read your file</h3>
-        <p>Ask a question and get an answer grounded in your document, with the page it came from. If your material doesn't cover it, Mentra says so instead of inventing an answer.</p>
-      </div>
-      <div class="feature">
-        <h3>Summaries that fit the subject</h3>
-        <p>A plain-language overview, the points worth revising, and an exam note — all drawn from that specific file, never a generic example borrowed from another subject.</p>
-      </div>
-      <div class="feature">
-        <h3>Flashcards and 30-question quizzes</h3>
-        <p>Generated from your material at your class level, with an explanation for every answer you get wrong.</p>
-      </div>
-      <div class="feature">
-        <h3>A solver that shows its working</h3>
-        <p>Type a maths or science problem, or photograph it. You get the method step by step, the final answer with units, and a check on whether it makes sense.</p>
-      </div>
-      <div class="feature">
-        <h3>A planner that actually reminds you</h3>
-        <p>Put study sessions, revision and exams on a calendar. Your phone alerts you at the time you chose, whether or not you have data.</p>
-      </div>
-      <div class="feature">
-        <h3>Reading progress worth trusting</h3>
-        <p>Mentra remembers how far into each file you got and reopens it there — no hunting for where you stopped last night.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="how" class="rule-top">
-    <div class="section-head">
-      <span class="eyebrow">How it works</span>
-      <h2>Three steps, then it's yours.</h2>
-    </div>
-    <div class="steps">
-      <div class="step">
-        <span class="n">STEP 1</span>
-        <h3>Add your material</h3>
-        <p>PDFs, Word documents, slides, spreadsheets, notes, or a photo of a page. Up to 25 MB each. Everything stays private to your account.</p>
-      </div>
-      <div class="step">
-        <span class="n">STEP 2</span>
-        <h3>Ask, or let it summarise</h3>
-        <p>Put your question in your own words. Mentra finds the relevant pages and answers from them, citing where it looked.</p>
-      </div>
-      <div class="step">
-        <span class="n">STEP 3</span>
-        <h3>Turn it into practice</h3>
-        <p>Build flashcards or a quiz from the same file, then schedule the revision so you actually come back to it.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="rule-top">
-    <div class="section-head">
-      <span class="eyebrow">Who it's for</span>
-      <h2>Primary school through university.</h2>
-      <p>Mentra asks your country, level and class when you sign up, then pitches explanations to match. A JSS 2 student and a 300-level undergraduate get different answers to the same question.</p>
-    </div>
-    <div class="subjects">
-      <span class="subject">Mathematics</span>
-      <span class="subject">English</span>
-      <span class="subject">Biology</span>
-      <span class="subject">Chemistry</span>
-      <span class="subject">Physics</span>
-      <span class="subject">Agricultural science</span>
-      <span class="subject">Economics</span>
-      <span class="subject">Government</span>
-      <span class="subject">Literature</span>
-      <span class="subject">…or any subject you add yourself</span>
-    </div>
-  </section>
-
-  <section id="get" class="rule-top">
-    <div class="download">
-      <div>
-        <span class="eyebrow">Get Mentra</span>
-        <h2>Download and start tonight.</h2>
-        <p>Mentra isn't on the Play Store yet. Download the APK, allow installation from unknown sources when Android asks, and you're in. Nothing to pay.</p>
-        <div class="spec">
-          <div>VERSION<b>1.3.1</b></div>
-          <div>SIZE<b>88 MB</b></div>
-          <div>REQUIRES<b>Android 7.0+</b></div>
-          <div>PRICE<b>Free</b></div>
+    <section class="section steps-section" id="how-it-works">
+      <div class="wrap steps-layout">
+        <div class="steps-intro reveal">
+          <p class="eyebrow">How it works</p>
+          <h2 class="section-title">From material to mastery in three simple steps.</h2>
+          <p class="section-copy">Start with what you are already learning. Mentra helps turn it into a study system that fits your level and goals.</p>
+        </div>
+        <div class="steps">
+          <article class="step reveal">
+            <span class="step-number">1</span>
+            <div><h3>Add what you are learning.</h3><p>Upload a study file, choose a subject, or ask a question. Mentra keeps everything organised in your personal library.</p><div class="step-tags"><span>PDF</span><span>Word</span><span>PowerPoint</span><span>Images</span><span>Notes</span></div></div>
+          </article>
+          <article class="step reveal">
+            <span class="step-number">2</span>
+            <div><h3>Choose how you want to learn it.</h3><p>Read the original material, get a summary, ask for an explanation, create flashcards, or generate a full practice quiz.</p><div class="step-tags"><span>Explain</span><span>Summarise</span><span>Practise</span></div></div>
+          </article>
+          <article class="step reveal">
+            <span class="step-number">3</span>
+            <div><h3>Keep improving at your pace.</h3><p>Review your history, plan study sessions, receive reminders and return to the materials that need more attention.</p><div class="step-tags"><span>Plan</span><span>Review</span><span>Progress</span></div></div>
+          </article>
         </div>
       </div>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/KenechukwuDani7/mentra/releases/latest">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M4.5 19h15"></path>
-          </svg>
-          Download the APK
-        </a>
+    </section>
+
+    <section class="section demo-section" id="demo">
+      <div class="wrap">
+        <div class="demo-head reveal">
+          <div><p class="eyebrow">See Mentra in action</p><h2 class="section-title">A calmer way to get through your study day.</h2></div>
+          <p class="section-copy">The app keeps the important actions close: add a material, ask for help, practise what you learnt, and plan what comes next.</p>
+        </div>
+        <div class="demo-stage reveal">
+          <article class="demo-note"><i data-lucide="scan-text"></i><h3>Start with your material</h3><p>Upload it once, then use it for reading, summaries, grounded questions and practice.</p></article>
+          <div>
+            <div class="phone-frame"><video src="demo.mp4" controls autoplay muted loop playsinline preload="metadata" aria-label="Mentra mobile app demonstration"></video></div>
+            <p class="demo-caption">Product walkthrough • sound is off by default</p>
+          </div>
+          <article class="demo-note"><i data-lucide="route"></i><h3>Move at your own pace</h3><p>Mentra adapts the experience around your subjects, level and recent study activity.</p></article>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+
+    <section class="section" id="grounded">
+      <div class="wrap grounded-layout">
+        <div class="grounded-card reveal" aria-label="Example grounded answer">
+          <div class="doc-top"><span class="doc-icon"><i data-lucide="file-text"></i></span><div><strong>Introduction to Cell Biology.pdf</strong><span>Biology • 24 pages</span></div></div>
+          <div class="answer-card"><span class="answer-label">Mentra explanation</span><h3>Why are mitochondria important?</h3><p>They release usable energy from food so the cell can carry out essential work. That is why they are often described as the cell's power source.</p><span class="citation"><i data-lucide="quote"></i> Based on pages 6–7</span></div>
+        </div>
+        <div class="reveal">
+          <p class="eyebrow">Answers you can verify</p>
+          <h2 class="section-title">Your materials stay part of the answer.</h2>
+          <p class="section-copy">When you ask about an uploaded document, Mentra retrieves the most relevant parts before it responds. That keeps the answer connected to what you are actually studying.</p>
+          <div class="grounded-points">
+            <div class="grounded-point"><span class="mini"><i data-lucide="search-check"></i></span><div><h3>Finds relevant passages</h3><p>Mentra searches the selected material for the strongest supporting context.</p></div></div>
+            <div class="grounded-point"><span class="mini"><i data-lucide="graduation-cap"></i></span><div><h3>Explains at your level</h3><p>Your education stage and subjects help shape the language and depth of the response.</p></div></div>
+            <div class="grounded-point"><span class="mini"><i data-lucide="book-open-check"></i></span><div><h3>Points back to the source</h3><p>Citations make it easier to return to the material and confirm the explanation.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section for-learners">
+      <div class="wrap learner-card reveal">
+        <div class="learner-copy">
+          <p class="eyebrow">Made with local learners in mind</p>
+          <h2 class="section-title">A study companion that meets you where you are.</h2>
+          <p class="section-copy">Whether you are preparing for your next class, an exam, or a university course, Mentra helps you build a study process that feels personal and practical.</p>
+          <div class="learner-list"><span><i data-lucide="check"></i> Primary to university</span><span><i data-lucide="check"></i> Custom subjects</span><span><i data-lucide="check"></i> Multiple interface languages</span><span><i data-lucide="check"></i> Designed for mobile</span></div>
+        </div>
+        <div class="learner-visual" role="img" aria-label="African university student studying with Mentra"></div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="wrap faq-layout">
+        <div class="reveal"><p class="eyebrow">Frequently asked</p><h2 class="section-title">Good questions deserve clear answers.</h2></div>
+        <div class="faq-list reveal">
+          <details open><summary>Who is Mentra for?</summary><p>Mentra is designed for learners from primary school through university. Onboarding captures your country, education level, class and subjects so the experience starts at the right level.</p></details>
+          <details><summary>What files can I study with?</summary><p>Mentra supports PDFs, Word documents, PowerPoint files, images and notes. Video study files are not currently supported.</p></details>
+          <details><summary>Does Mentra only answer from uploaded files?</summary><p>No. You can ask general academic questions at any time. When a document is selected, Mentra grounds its answer in that material and can show where the supporting information came from.</p></details>
+          <details><summary>Can I read my PDF inside the app?</summary><p>Yes. The built-in reader lets you open your original PDF, move between pages and continue from your reading progress.</p></details>
+          <details><summary>Is the app free?</summary><p>Mentra is available for testing while the product is being developed. A free plan and optional paid plans are planned for the future, with clear pricing before any charges are introduced.</p></details>
+          <details><summary>Where can I get Mentra?</summary><p>The Android testing build is available from the latest GitHub release. App Store and Play Store releases are planned after testing and product validation.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="wrap cta-card reveal">
+        <h2 class="section-title">Study smarter. Achieve more.</h2>
+        <p>Bring your materials, questions, practice and plans into one focused study space.</p>
+        <div class="cta-actions"><a class="button button-primary" href="https://github.com/KenechukwuDani7/mentra/releases/latest">Download the Android test app <i data-lucide="download"></i></a><a class="button button-light" href="#how-it-works">See how it works <i data-lucide="arrow-up"></i></a></div>
+        <div class="coming-soon">iOS and public app-store releases are coming later.</div>
+      </div>
+    </section>
+  </main>
 
   <footer>
-    <span>Mentra — an AI study companion for African learners.</span>
-    <span><a href="https://github.com/KenechukwuDani7/mentra">Source on GitHub</a></span>
+    <div class="wrap footer-inner">
+      <div class="footer-main"><a class="brand" href="#top"><img src="mentra-mark.png" alt=""><span>Mentra</span></a><p class="footer-copy">An AI-powered study companion designed to help African learners understand more, practise better and stay on track.</p></div>
+      <div class="footer-col"><strong>Explore</strong><a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="#demo">Demo</a></div>
+      <div class="footer-col"><strong>Product</strong><a href="https://github.com/KenechukwuDani7/mentra/releases/latest">Android download</a><a href="https://github.com/KenechukwuDani7/mentra">GitHub</a><a href="#faq">FAQ</a></div>
+      <div class="copyright">© <span id="year"></span> Mentra. Built to help learners make real progress.</div>
+    </div>
   </footer>
-</div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) window.lucide.createIcons();
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      const toggle = document.getElementById('menuToggle');
+      const links = document.getElementById('navLinks');
+      const closeMenu = () => {
+        links.classList.remove('open');
+        document.body.classList.remove('menu-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Open menu');
+        toggle.innerHTML = '<i data-lucide="menu"></i>';
+        if (window.lucide) window.lucide.createIcons();
+      };
+      toggle.addEventListener('click', () => {
+        const open = links.classList.toggle('open');
+        document.body.classList.toggle('menu-open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+        toggle.innerHTML = open ? '<i data-lucide="x"></i>' : '<i data-lucide="menu"></i>';
+        if (window.lucide) window.lucide.createIcons();
+      });
+      links.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced || !('IntersectionObserver' in window)) {
+        document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
+      } else {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: .12 });
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+      }
+    });
+  </script>
+</body>
+</html>
