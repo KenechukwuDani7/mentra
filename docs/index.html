@@ -105,7 +105,7 @@
       pointer-events: none;
     }
     .nav-shell {
-      width: min(1120px, calc(100% - 28px));
+      width: min(1210px, calc(100% - 48px));
       min-height: 68px;
       margin: 0 auto;
       padding: 10px 12px 10px 18px;
@@ -126,6 +126,13 @@
     .nav-links a { color: #3d424b; font-size: 14px; font-weight: 700; }
     .nav-links a:hover { color: var(--blue); }
     .nav-cta { min-height: 46px; padding-inline: 18px; }
+    .nav-links .nav-cta { color: var(--white); }
+    .nav-links .nav-cta:hover {
+      color: var(--blue);
+      border-color: var(--blue);
+      background: var(--white);
+      box-shadow: 0 10px 24px rgba(31, 95, 219, .16);
+    }
     .menu-toggle { display: none; width: 46px; height: 46px; border: 0; border-radius: 50%; background: var(--ink); color: white; }
 
     .hero { padding: 104px 0 24px; }
