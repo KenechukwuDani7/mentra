@@ -10,9 +10,12 @@ import Pdf from 'react-native-pdf';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
+  type KeyboardEvent,
   Modal,
   Platform,
   Pressable,
@@ -2089,12 +2092,37 @@ function LegacyQuizSheet({ visible, theme, onClose }: { visible: boolean; theme:
 }
 
 function BottomSheet({ visible, theme, onClose, children, tall = false }: { visible: boolean; theme: AppTheme; onClose: () => void; children: React.ReactNode; tall?: boolean }) {
+  const [androidKeyboardInset, setAndroidKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) {
+      setAndroidKeyboardInset(0);
+      return undefined;
+    }
+
+    const shown = Keyboard.addListener('keyboardDidShow', (event: KeyboardEvent) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      const windowHeight = Dimensions.get('window').height;
+      setAndroidKeyboardInset(Math.max(0, Math.round(windowHeight - event.endCoordinates.screenY)));
+    });
+    const hidden = Keyboard.addListener('keyboardDidHide', (event: KeyboardEvent) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setAndroidKeyboardInset(0);
+    });
+
+    return () => {
+      shown.remove();
+      hidden.remove();
+      setAndroidKeyboardInset(0);
+    };
+  }, [visible]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" presentationStyle="overFullScreen" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
-        behavior="padding"
-        enabled
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios'}
       >
         <View style={styles.modalWrap}>
           <Pressable accessibilityRole="button" accessibilityLabel="Close" style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={onClose} />
@@ -2117,7 +2145,15 @@ function BottomSheet({ visible, theme, onClose, children, tall = false }: { visi
             >
               <Ionicons name="close" color={theme.textMuted} size={19} />
             </Pressable>
-            <View style={[styles.sheetContent, tall ? styles.tallSheetContent : null]}>{children}</View>
+            <View
+              style={[
+                styles.sheetContent,
+                tall ? styles.tallSheetContent : null,
+                androidKeyboardInset > 0 ? { paddingBottom: androidKeyboardInset } : null,
+              ]}
+            >
+              {children}
+            </View>
           </SafeAreaView>
         </View>
       </KeyboardAvoidingView>

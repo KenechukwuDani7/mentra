@@ -3,7 +3,7 @@
     "name": "Mentra",
     "slug": "mentra",
     "scheme": "mentra",
-    "version": "1.3.3",
+    "version": "1.3.4",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/mentra-mark.png",
@@ -22,7 +22,7 @@
       "bundleIdentifier": "com.mentra.study"
     },
     "android": {
-      "versionCode": 19,
+      "versionCode": 20,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/mentra-mark.png",
