@@ -2090,11 +2090,11 @@ function LegacyQuizSheet({ visible, theme, onClose }: { visible: boolean; theme:
 
 function BottomSheet({ visible, theme, onClose, children, tall = false }: { visible: boolean; theme: AppTheme; onClose: () => void; children: React.ReactNode; tall?: boolean }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" presentationStyle="overFullScreen" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        enabled={Platform.OS === 'ios'}
+        behavior="padding"
+        enabled
       >
         <View style={styles.modalWrap}>
           <Pressable accessibilityRole="button" accessibilityLabel="Close" style={[styles.backdrop, { backgroundColor: theme.scrim }]} onPress={onClose} />
