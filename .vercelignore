@@ -7,7 +7,7 @@ node_modules/
 assets/
 src/
 supabase/
-Mentra-*.apk
+/Mentra-*-build*.apk
 .env*
 .easignore
 app.json
